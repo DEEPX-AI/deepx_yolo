@@ -65,3 +65,4 @@ temp/
 datasets/
 runs/
 **/runs/
+!lib/ultralytics/
