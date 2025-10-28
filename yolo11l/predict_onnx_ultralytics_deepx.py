@@ -47,14 +47,20 @@ from datetime import datetime
 from ultralytics import YOLO
 
 # Configuration
+DEBUG_MODE = 1  # Set to 1 to enable AutoBackend debug output, 0 to disable
+
+# Set environment variable for AutoBackend to check
+import os
+os.environ['DEEPX_DEBUG_MODE'] = str(DEBUG_MODE)
+
 CURRENT_DIR = Path(__file__).parent
 PROJECT_ROOT = CURRENT_DIR.parent
 MODEL_EXTENSION = 'onnx'
 MODEL_NAME = f'{CURRENT_DIR.name}'
 MODEL_FILE = f'{CURRENT_DIR.name}.{MODEL_EXTENSION}'
 MODEL_PATH = PROJECT_ROOT / MODEL_NAME / 'models' / MODEL_FILE
-# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'boats.jpg'
-SOURCE_PATH = PROJECT_ROOT / 'assets'
+SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images' / 'bus.jpg'      # for image file
+# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images'                    # for image directory
 OUTPUT_SUBDIR = CURRENT_DIR / 'runs' / 'predict' / MODEL_EXTENSION / "ultralytics_deepx"
 DEBUG_OUTPUT_DIR = OUTPUT_SUBDIR / 'debug'   # Directory to save debug outputs
 DEBUG_ORIGIN_OUTPUT_DIR = DEBUG_OUTPUT_DIR / 'origin_output'
@@ -141,12 +147,12 @@ def analyze_results(result, filename):
     confidences = result.boxes.conf.cpu().numpy()
     print(f"Confidence range: {np.min(confidences):.3f} ~ {np.max(confidences):.3f}")
     print(f"Confidences >= 0.25: {np.sum(confidences >= 0.25)}")
-    
+
     # Check class distribution
     classes = result.boxes.cls.cpu().numpy()
     unique_classes, counts = np.unique(classes, return_counts=True)
     print(f"Class distribution: {dict(zip(unique_classes.astype(int), counts))}")
-    
+
     # More detailed conf analysis
     conf_bins = [0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     for i in range(len(conf_bins)-1):
@@ -191,9 +197,9 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
 
         # Create output directory
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        
-        if not debug:
-            print("[INFO] Even if debug=False, Ultralytics DEEPX always saves debug data(preprocessed image, raw output).")
+
+        if debug:
+            print("[INFO] Debug mode enabled, Ultralytics DEEPX saves debug data(preprocessed image, raw output).")
 
         # Load the ONNX model (use task='detect' for object detection)
         model = YOLO(model=model_path, task='detect')
@@ -243,7 +249,7 @@ def main():
         print(f"Results will be saved in '{OUTPUT_DIR}' folder.")
         print("-" * 50)
 
-        result_path = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=True)
+        result_path = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=DEBUG_MODE)
         if result_path:
             saved_files.append(result_path)
 

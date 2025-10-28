@@ -25,14 +25,16 @@ from ultralytics.utils import ops
 from ultralytics.utils.nms import non_max_suppression
 
 # Configuration
+DEBUG_MODE = 1  # Set to 1 to enable debug output, 0 to disable
+
 CURRENT_DIR = Path(__file__).parent
 PROJECT_ROOT = CURRENT_DIR.parent
 MODEL_EXTENSION = 'dxnn'
 MODEL_NAME = f'{CURRENT_DIR.name}'
 MODEL_FILE = f'{CURRENT_DIR.name}.{MODEL_EXTENSION}'
 MODEL_PATH = PROJECT_ROOT / MODEL_NAME / 'models' / MODEL_FILE
-# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'boats.jpg'
-SOURCE_PATH = PROJECT_ROOT / 'assets'
+SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images' / 'bus.jpg'      # for image file
+# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images'                    # for image directory
 OUTPUT_SUBDIR = CURRENT_DIR / 'runs' / 'predict' / MODEL_EXTENSION / "ultralytics_postprocess"
 DEBUG_OUTPUT_DIR = OUTPUT_SUBDIR / 'debug'   # Directory to save debug outputs
 OUTPUT_DIR = OUTPUT_SUBDIR  # Directory to save results
@@ -557,7 +559,7 @@ def main():
         print(f"Results will be saved in '{OUTPUT_DIR}' folder.")
         print("-" * 50)
 
-        result_path = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=True)
+        result_path = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=DEBUG_MODE)
         if result_path:
             saved_files.append(result_path)
 
