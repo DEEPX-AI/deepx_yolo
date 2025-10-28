@@ -949,6 +949,12 @@ def postprocess_segmentation(outputs, orig_img):
     print(f"[Postprocess] Box data shape after scale: {pred_boxes.shape}")
     print(f"[Postprocess] Confidence range: {pred_boxes[:, 4].min():.3f} ~ {pred_boxes[:, 4].max():.3f}")
     
+    # Filter out any masks that are completely empty
+    if masks is not None:
+        keep = masks.amax((-2, -1)) > 0  # only keep predictions with masks
+        if not all(keep):  # most predictions have masks
+            pred_boxes, masks = pred_boxes[keep], masks[keep]  # indexing is slow
+    
     # Create Results object
     result = Results(
         orig_img=orig_img,

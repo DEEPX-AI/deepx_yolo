@@ -1,7 +1,3 @@
-# TODO:
-# ultralytics deepx 라이브러리의 AutoBackend.forward() 함수에서 처리되는 경우 
-# bboxes 가 오동작함. 확인필요
-
 """
 YOLOv11 Segmentation DXNN Inference using Custom Ultralytics DEEPX Library
 
