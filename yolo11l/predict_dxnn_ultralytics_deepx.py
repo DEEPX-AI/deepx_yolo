@@ -9,7 +9,48 @@ Implementation details:
 - Inference: DXNN Runtime execution via Ultralytics AutoBackend
 - Postprocessing: Ultralytics internal NMS and Results generation
 
-Dependencies: cv2, numpy, ultralytics (customized by DEEPX)
+Dependencies: cv2, numpy, dx_engine, ultralytics (customized by DEEPX)
+
+===================================================================================
+PERFORMANCE MEASUREMENT BREAKDOWN
+===================================================================================
+
+This script measures two types of performance metrics:
+
+1. INFERENCE TIME (Pure Inference Only)
+   -----------------------------------------------------------------------
+   Measures ONLY the time spent in: model(source=image_path, ...)
+   
+   Pipeline Scope:
+   ├─ [MEASURED] Preprocessing (letterbox, normalization, HWC→CHW conversion)
+   ├─ [MEASURED] Runtime Inference (model execution on NPU/GPU)
+   └─ [MEASURED] Postprocessing (NMS, coordinate scaling, Results creation)
+   
+   What's INCLUDED:
+   - Image preprocessing (resize, padding, normalization)
+   - Tensor format conversion (numpy ↔ torch, CPU ↔ GPU)
+   - model inference execution
+   - Non-Maximum Suppression (NMS)
+   - Bounding box coordinate transformation
+   - Results object creation
+   
+   What's EXCLUDED:
+   - Image file I/O (imread/imwrite)
+   - Result visualization (drawing boxes on images)
+   - Progress printing and statistics calculation
+
+2. OVERALL PROCESSING TIME (Overall Pipeline)
+   -----------------------------------------------------------------------
+   Measures the ENTIRE end-to-end processing time
+   
+   Pipeline Scope:
+   ├─ Image file loading
+   ├─ [INFERENCE TIME] <- All inference components (see above)
+   ├─ Result visualization (drawing boxes/labels)
+   ├─ Image file saving
+   └─ Statistics calculation and display
+
+===================================================================================
 """
 
 # IMPORTANT: Import this BEFORE any ultralytics imports
@@ -59,8 +100,8 @@ MODEL_EXTENSION = 'dxnn'
 MODEL_NAME = f'{CURRENT_DIR.name}'
 MODEL_FILE = f'{CURRENT_DIR.name}.{MODEL_EXTENSION}'
 MODEL_PATH = PROJECT_ROOT / MODEL_NAME / 'models' / MODEL_FILE
-SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images' / 'bus.jpg'      # for image file
-# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images'                    # for image directory
+# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images' / 'bus.jpg'      # for image file
+SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images'                    # for image directory
 OUTPUT_SUBDIR = CURRENT_DIR / 'runs' / 'predict' / MODEL_EXTENSION / "ultralytics_deepx"
 DEBUG_OUTPUT_DIR = OUTPUT_SUBDIR / 'debug'   # Directory to save debug outputs
 DEBUG_ORIGIN_OUTPUT_DIR = DEBUG_OUTPUT_DIR / 'origin_output'
@@ -187,9 +228,17 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         show: Display output image
     
     Returns:
-        str: Path to output image if successful, None otherwise
+        tuple: (output_path, statistics_dict) if successful, (None, None) otherwise
+        statistics_dict contains: inference_time, total_time
     """
     try:
+        import time
+        
+        # ============================================================================
+        # TOTAL PROCESSING TIME MEASUREMENT START (Overall Pipeline)
+        # ============================================================================
+        start_time = time.perf_counter()
+        
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]
 
         # Process image
@@ -201,21 +250,30 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         if debug:
             print("[INFO] Debug mode enabled, Ultralytics DEEPX saves debug data(preprocessed image, raw output).")
 
-        # Load the DXNN model (use task='detect' for object detection)
+        # Load the ONNX model (use task='detect' for object detection)
         model = YOLO(model=model_path, task='detect')
 
         # Debug: Verify model class names
         print("DXNN Model names:", model.names)
 
-        # Run inference using Ultralytics YOLO class
-        # The YOLO class internally handles:
-        # 1. Preprocessing: letterbox, normalization, channel conversion
-        # 2. Inference: DXNN Runtime execution via AutoBackend
-        # 3. Postprocessing: NMS, coordinate scaling, Results object creation
+        # ============================================================================
+        # INFERENCE TIME MEASUREMENT START
+        # ============================================================================
+        # This measures ONLY the model inference pipeline:
+        # 1. Preprocessing (letterbox, normalization, format conversion)
+        # 2. Runtime inference execution
+        # 3. Postprocessing (NMS, coordinate scaling, Results creation)
+        # ============================================================================
+        inference_start = time.perf_counter()
         results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR)
+        inference_time = time.perf_counter() - inference_start
+        # ============================================================================
+        # INFERENCE TIME MEASUREMENT END
+        # ============================================================================
+        
         result = results[0]  # Get first (and only) result
 
-        # 4. Visualization and analysis
+        # 4. Visualization and analysis (NOT included in inference_time)
         filename = Path(image_path).stem
         output_filename = Path(image_path).stem + f'_detected_{timestamp}.jpg'
         output_path = str(Path(output_dir) / output_filename)
@@ -226,13 +284,28 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         # Print analysis result
         analyze_results(result, filename)
 
-        return output_path
+        # ============================================================================
+        # TOTAL PROCESSING TIME MEASUREMENT END
+        # ============================================================================
+        overall_time = time.perf_counter() - start_time
+        
+        # Print timing statistics
+        print(f"\n[Timing] Inference: {inference_time:.3f}s | Total: {overall_time:.3f}s")
+        
+        # Prepare statistics dictionary
+        stats = {
+            'inference_time': inference_time,
+            'overall_time': overall_time,
+            'filename': Path(image_path).name
+        }
+        
+        return output_path, stats
 
     except Exception as e:
         print(f"[{Path(image_path).name}] Error occurred during processing: {str(e)}")
         import traceback
         traceback.print_exc()
-        return None
+        return None, None
 
 def main():
     """
@@ -240,6 +313,7 @@ def main():
     Supports batch processing and provides detailed summary.
     """
     saved_files = []
+    image_statistics = {}  # Store statistics for each image
     
     source_path = Path(SOURCE_PATH)
 
@@ -249,9 +323,10 @@ def main():
         print(f"Results will be saved in '{OUTPUT_DIR}' folder.")
         print("-" * 50)
 
-        result_path = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=DEBUG_MODE)
+        result_path, stats = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=DEBUG_MODE)
         if result_path:
             saved_files.append(result_path)
+            image_statistics[Path(result_path).name] = stats
 
     elif source_path.is_dir():
         print("Processing directory of images.")
@@ -274,25 +349,88 @@ def main():
         for idx, image_path in enumerate(image_files, 1):
             print(f"\n[{idx}/{len(image_files)}] Processing: {image_path.name}")
             print("-" * 50)
-            result_path = run_inference(MODEL_PATH, str(image_path), OUTPUT_DIR, debug=True)
+            result_path, stats = run_inference(MODEL_PATH, str(image_path), OUTPUT_DIR, debug=True)
             if result_path:
                 saved_files.append(result_path)
+                image_statistics[Path(result_path).name] = stats
     else:
         print(f"Error: {source_path} is neither a file nor a directory")
         return
 
     # Print summary
-    print(f"\n{'='*70}")
+    print(f"\n{'='*80}")
     print("PROCESSING SUMMARY")
-    print(f"{'='*70}")
+    print(f"{'='*80}")
     print(f"Total images processed: {len(saved_files)}")
     print(f"Output directory: {OUTPUT_DIR}")
-    print(f"\nSaved files:")
-    for idx, file_path in enumerate(saved_files, 1):
-        print(f"  {idx}. {Path(file_path)}")
-    print(f"{'='*70}")
+    
+    # Calculate total statistics
+    total_inference_time = sum(stats['inference_time'] for stats in image_statistics.values() if stats)
+    total_overall_time = sum(stats['overall_time'] for stats in image_statistics.values() if stats)
+    
+    if image_statistics:
+        print(f"\n{'='*80}")
+        print("IMAGE PROCESSING STATISTICS")
+        print(f"{'='*80}")
+        
+        for idx, file_path in enumerate(saved_files, 1):
+            filename = Path(file_path).name
+            
+            print(f"\n[{idx}] {filename}")
+            
+            if filename in image_statistics:
+                stats = image_statistics[filename]
+                if stats:
+                    inference_pct = (stats['inference_time'] / stats['overall_time'] * 100) if stats['overall_time'] > 0 else 0
+                    fps_overall = (1.0 / stats['overall_time']) if stats['overall_time'] > 0 else 0
+                    fps_inference = (1.0 / stats['inference_time']) if stats['inference_time'] > 0 else 0
+                    print(f"    Source:                {stats['filename']}")
+                    print(f"    Total Processing Time: {stats['overall_time']:.3f}s")
+                    print(f"    Pure Inference Time:   {stats['inference_time']:.3f}s ({inference_pct:.1f}%)")
+                    print(f"    FPS (Overall):         {fps_overall:.2f}")
+                    print(f"    FPS (Inference Only):  {fps_inference:.2f}")
+        
+        # Aggregate statistics
+        num_images = len(image_statistics)
+        inference_percentage = (total_inference_time / total_overall_time * 100) if total_overall_time > 0 else 0
+        avg_inference_time = total_inference_time / num_images if num_images > 0 else 0
+        avg_overall_time = total_overall_time / num_images if num_images > 0 else 0
+        
+        print(f"\n{'='*80}")
+        print("AGGREGATE STATISTICS (All Images)")
+        print(f"{'='*80}")
+        print(f"Total Images:                       {num_images}")
+        print(f"Total Overall Processing Time:      {total_overall_time:.3f}s")
+        print(f"Total Pure Inference Time:          {total_inference_time:.3f}s ({inference_percentage:.1f}%)")
+        print(f"Average Overall Time:                 {avg_overall_time:.3f}s per image")
+        print(f"Average Pure Inference Time:             {avg_inference_time:.3f}s per image")
+
+        # Calculate aggregate FPS
+        total_fps_overall = (num_images / total_overall_time) if total_overall_time > 0 else 0
+        total_fps_inference = (num_images / total_inference_time) if total_inference_time > 0 else 0
+        print(f"Total FPS (Overall):                {total_fps_overall:.2f}")
+        print(f"Total FPS (Inference Only):         {total_fps_inference:.2f}")
+        
+        # Performance breakdown explanation
+        print(f"\n{'='*80}")
+        print("PERFORMANCE BREAKDOWN EXPLANATION")
+        print(f"{'='*80}")
+        overhead_time = total_overall_time - total_inference_time
+        overhead_percentage = (overhead_time / total_overall_time * 100) if total_overall_time > 0 else 0
+        print(f"\nTotal Processing Time Breakdown:")
+        print(f"  ├─ Pure Inference Time:  {total_inference_time:.2f}s ({inference_percentage:.1f}%)")
+        print(f"  │  ├─ Preprocessing:     (letterbox, normalization)")
+        print(f"  │  ├─ Inference:         (NPU/GPU execution)")
+        print(f"  │  └─ Postprocessing:    (NMS, coordinate scaling)")
+        print(f"  │")
+        print(f"  └─ Overhead Time:        {overhead_time:.2f}s ({overhead_percentage:.1f}%)")
+        print(f"     ├─ I/O:               (imread, imwrite)")
+        print(f"     ├─ Visualization:     (drawing boxes, labels)")
+        print(f"     └─ Misc:              (statistics, printing)")
+    
+    print(f"\n{'='*80}")
     print("Processing completed successfully!")
-    print(f"{'='*70}\n")
+    print(f"{'='*80}\n")
 
 
 if __name__ == "__main__":
