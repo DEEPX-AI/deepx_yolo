@@ -3,7 +3,7 @@
 
 # Core ML/AI packages
 ultralytics>=8.3.0          # YOLOv11 framework
-onnxruntime>=1.16.0         # ONNX model inference
+onnxruntime>=1.20.1         # ONNX model inference
 numpy>=1.21.0               # Numerical computing
 torch>=2.0.0                # PyTorch for tensor operations
 

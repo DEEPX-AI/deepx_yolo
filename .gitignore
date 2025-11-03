@@ -66,4 +66,5 @@ datasets/
 runs/
 **/runs/
 !lib/ultralytics/
-assets/videos/
+assets/
+!assets/images/

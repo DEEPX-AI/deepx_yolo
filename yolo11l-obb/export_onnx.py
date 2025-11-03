@@ -22,12 +22,10 @@ def main():
         # Load YOLOv11l-obb model
         model = YOLO(model=model_path)
 
-        # Convert model to ONNX format 
-        # Using default opset (18+) to avoid version conversion issues
-        # opset=12 causes compatibility issues with Resize operators in YOLOv11
-        model.export(format='onnx')
+        # Convert model to ONNX format with opset 21
+        model.export(format='onnx', opset=21)
 
-        print("Successfully converted YOLOv11l-obb model to ONNX format. 'models/yolo11l-obb.onnx' file has been created.")
+        print("Successfully converted YOLO11l OBB model to ONNX format (opset 21). 'models/yolo11l-obb.onnx' file has been created.")
     except Exception as e:
         print(f"Error: {e}")
 
