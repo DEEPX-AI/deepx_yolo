@@ -151,7 +151,7 @@ python export_onnx.py
 **export_onnx.py 기능:**
 - `models/yolo11l.pt` → `models/yolo11l.onnx`로 변환
 - 모델 구성과 함께 metadata.yaml 내보내기
-- 최대 호환성을 위해 ONNX opset 12 사용
+- 최대 호환성을 위해 ONNX opset 21 사용
 - 기업 환경을 위한 SSL 인증서 우회 지원
 
 ### 2. 객체 감지 추론

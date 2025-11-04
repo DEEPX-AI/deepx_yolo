@@ -327,7 +327,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         # 3. Postprocessing (NMS, coordinate scaling, Results creation)
         # ============================================================================
         inference_start = time.perf_counter()
-        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR)
+        # IMPORTANT: rect=False forces square padding (640x640) for DEEPX NPU fixed input shape
+        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR, imgsz=640, rect=False)
         inference_time = time.perf_counter() - inference_start
         # ============================================================================
         # INFERENCE TIME MEASUREMENT END

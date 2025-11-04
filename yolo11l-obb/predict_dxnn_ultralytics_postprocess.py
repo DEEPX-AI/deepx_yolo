@@ -49,7 +49,7 @@ CLASSES = ['plane', 'ship', 'storage-tank', 'baseball-diamond', 'tennis-court', 
            'ground-track-field', 'harbor', 'bridge', 'large-vehicle', 'small-vehicle', 'helicopter', 
            'roundabout', 'soccer-ball-field', 'swimming-pool']
 
-def letterbox(image, new_shape=(1024, 1024), color=(114, 114, 114), auto=False, scaleFill=False, scaleup=True, stride=64):
+def letterbox(image, new_shape=(1024, 1024), color=(114, 114, 114), auto=False, scaleFill=False, scaleup=True, stride=32):
     """
     Resize and pad image while meeting stride-multiple constraints.
     Custom implementation based on Ultralytics letterbox function.

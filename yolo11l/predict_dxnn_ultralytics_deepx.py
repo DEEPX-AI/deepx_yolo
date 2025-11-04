@@ -100,8 +100,8 @@ MODEL_EXTENSION = 'dxnn'
 MODEL_NAME = f'{CURRENT_DIR.name}'
 MODEL_FILE = f'{CURRENT_DIR.name}.{MODEL_EXTENSION}'
 MODEL_PATH = PROJECT_ROOT / MODEL_NAME / 'models' / MODEL_FILE
-# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images' / 'bus.jpg'      # for image file
-SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images'                    # for image directory
+SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images' / 'bus.jpg'      # for image file
+# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images'                    # for image directory
 OUTPUT_SUBDIR = CURRENT_DIR / 'runs' / 'predict' / MODEL_EXTENSION / "ultralytics_deepx"
 DEBUG_OUTPUT_DIR = OUTPUT_SUBDIR / 'debug'   # Directory to save debug outputs
 DEBUG_ORIGIN_OUTPUT_DIR = DEBUG_OUTPUT_DIR / 'origin_output'
@@ -250,7 +250,7 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         if debug:
             print("[INFO] Debug mode enabled, Ultralytics DEEPX saves debug data(preprocessed image, raw output).")
 
-        # Load the ONNX model (use task='detect' for object detection)
+        # Load the DXNN model (use task='detect' for object detection)
         model = YOLO(model=model_path, task='detect')
 
         # Debug: Verify model class names
@@ -265,7 +265,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         # 3. Postprocessing (NMS, coordinate scaling, Results creation)
         # ============================================================================
         inference_start = time.perf_counter()
-        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR)
+        # IMPORTANT: rect=False forces square padding (640x640) for DEEPX NPU fixed input shape
+        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR, imgsz=640, rect=False)
         inference_time = time.perf_counter() - inference_start
         # ============================================================================
         # INFERENCE TIME MEASUREMENT END

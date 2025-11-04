@@ -24,13 +24,14 @@ This script measures two types of performance metrics:
    Pipeline Scope:
    ├─ [MEASURED] Preprocessing (letterbox, normalization, HWC→CHW conversion)
    ├─ [MEASURED] Runtime Inference (model execution on NPU/GPU)
-   └─ [MEASURED] Postprocessing (NMS, coordinate scaling, Results creation)
+   └─ [MEASURED] Postprocessing (NMS, Regularize rotated boxes, coordinate scaling, Results creation)
    
    What's INCLUDED:
    - Image preprocessing (resize, padding, normalization)
    - Tensor format conversion (numpy ↔ torch, CPU ↔ GPU)
    - model inference execution
    - Non-Maximum Suppression (NMS)
+   - Regularization of rotated boxes
    - Bounding box coordinate transformation
    - Results object creation
    
@@ -100,8 +101,8 @@ MODEL_EXTENSION = 'onnx'
 MODEL_NAME = f'{CURRENT_DIR.name}'
 MODEL_FILE = f'{CURRENT_DIR.name}.{MODEL_EXTENSION}'
 MODEL_PATH = PROJECT_ROOT / MODEL_NAME / 'models' / MODEL_FILE
-# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images' / 'boats.jpg'      # for image file
-SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images'                    # for image directory
+SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images' / 'boats.jpg'      # for image file
+# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images'                    # for image directory
 OUTPUT_SUBDIR = CURRENT_DIR / 'runs' / 'predict' / MODEL_EXTENSION / "ultralytics_deepx"
 DEBUG_OUTPUT_DIR = OUTPUT_SUBDIR / 'debug'   # Directory to save debug outputs
 DEBUG_ORIGIN_OUTPUT_DIR = DEBUG_OUTPUT_DIR / 'origin_output'
@@ -255,7 +256,7 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         if debug:
             print("[INFO] Debug mode enabled, Ultralytics DEEPX saves debug data(preprocessed image, raw output).")
 
-        # Load the ONNX model (use task='obb' for object detection)
+        # Load the ONNX model (use task='obb' for oriented object detection)
         model = YOLO(model=model_path, task='obb')
 
         # Debug: Verify model class names
@@ -267,10 +268,10 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         # This measures ONLY the model inference pipeline:
         # 1. Preprocessing (letterbox, normalization, format conversion)
         # 2. Runtime inference execution
-        # 3. Postprocessing (NMS, coordinate scaling, Results creation)
+        # 3. Postprocessing (NMS, Regularization of rotated boxes, coordinate scaling, Results creation)
         # ============================================================================
         inference_start = time.perf_counter()
-        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR)
+        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR, imgsz=1024, rect=False)
         inference_time = time.perf_counter() - inference_start
         # ============================================================================
         # INFERENCE TIME MEASUREMENT END
@@ -426,7 +427,7 @@ def main():
         print(f"  ├─ Pure Inference Time:  {total_inference_time:.2f}s ({inference_percentage:.1f}%)")
         print(f"  │  ├─ Preprocessing:     (letterbox, normalization)")
         print(f"  │  ├─ Inference:         (NPU/GPU execution)")
-        print(f"  │  └─ Postprocessing:    (NMS, coordinate scaling)")
+        print(f"  │  └─ Postprocessing:    (NMS, Regularization of rotated boxes, coordinate scaling)")
         print(f"  │")
         print(f"  └─ Overhead Time:        {overhead_time:.2f}s ({overhead_percentage:.1f}%)")
         print(f"     ├─ I/O:               (imread, imwrite)")

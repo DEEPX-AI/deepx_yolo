@@ -5,14 +5,14 @@
 task: obb
 stride: 32
 batch: 1
-imgsz: [640, 640]
+imgsz: [1024, 1024]
 channels: 3
 
 # Model arguments used during export
 args:
-  batch: 1
+  batch: 1          # for fixed batch size (ignored if dynamic=true)
   half: false
-  dynamic: false
+  dynamic: true     # for dynamic batch size support
   simplify: true
   nms: false
 

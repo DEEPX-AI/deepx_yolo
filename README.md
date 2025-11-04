@@ -151,7 +151,7 @@ python export_onnx.py
 **export_onnx.py features:**
 - Converts `models/yolo11l.pt` → `models/yolo11l.onnx`
 - Exports metadata.yaml with model configuration
-- Uses ONNX opset 12 for maximum compatibility
+- Uses ONNX opset 21 for maximum compatibility
 - Supports SSL certificate bypass for corporate environments
 
 ### 2. Object Detection Inference

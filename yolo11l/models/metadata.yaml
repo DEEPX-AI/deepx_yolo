@@ -10,9 +10,9 @@ channels: 3
 
 # Model arguments used during export
 args:
-  batch: 1
+  batch: 1          # for fixed batch size (ignored if dynamic=true)
   half: false
-  dynamic: false
+  dynamic: true     # for dynamic batch size support
   simplify: true
   nms: false
 
