@@ -266,49 +266,224 @@ python predict_dxnn_ultralytics_deepx.py
 ### 4. 실행 결과 예제
 
 ```plaintext
-Processing directory of images.
-Results will be saved in 'runs/predict/onnx/standalone' folder.
+Processing single image file.
+Letterbox mode: square padding
+Results will be saved in '/data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/dxnn/standalone' folder.
 --------------------------------------------------
 
-[1/3] Processing: boats.jpg
+Processing: bus.jpg
 Debug info:
-  Original size: 1280x720
-  Ratio: (0.5, 0.5)
+  Original size: 810x1080
+  Letterbox mode: square padding
+  Preprocessing shape: (640, 640)
+  Ratio: (0.5925925925925926, 0.5925925925925926)
   Padding (dw, dh): (80.0, 0.0)
-  Input tensor shape: (1, 3, 640, 640)
-  Input tensor range: [0.000, 1.000]
 
-Loading ONNX model: models/yolo11l.onnx
-Running ONNX inference...
-Raw output shape: (1, 84, 8400)
-Raw output range: [-4.234, 8.567]
+[Preprocess] Input tensor shape: (1, 3, 640, 640)
+[Preprocess]  Preprocessing shape (H, W): (640, 640)
+[Preprocess]  Input tensor range: [0.000, 1.000]
+Tensor visualization saved to: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/dxnn/standalone/debug/input/preprocessed_input_bus_20251106_101311_990.jpg
+[Debug] Preprocessed Input Tensor - Shape: (640, 640, 3)
+/data/home/dhyang/git/deepx_yolo/venv/lib/python3.12/site-packages/dx_engine/utils.py:23: UserWarning: ndarray(shape=(640, 640, 3), dtype=uint8) is not contiguous; converting.
+  warnings.warn(
+Raw output[0] shape: (1, 84, 8400)
+Raw output[0] range: [0.000, 656.422]
+Inference Raw output saved to: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/dxnn/standalone/debug/raw_output/raw_output0_bus_20251106_101311_990.npy
 
-[Postprocess] Total detections: 2
+[Postprocess] Input shape: torch.Size([1, 84, 8400])
+[Postprocess] Input range: [0.000, 656.422]
+[Postprocess] NMS output: 1 image(s)
+[Postprocess] First result shape: torch.Size([5, 6])
+[Postprocess] Total detections: 5
+[Postprocess] Pred shape before scale: torch.Size([5, 6])
+[Postprocess] Pred sample (first detection): tensor([ 81.5273, 133.9609, 554.6602, 442.5391,   0.9299,   5.0000])
+[Postprocess] Using preprocessing shape: (640, 640)
+[Postprocess] Box data shape after scale: torch.Size([5, 6])
+[Postprocess] Confidence range: 0.849 ~ 0.930
+Detection result saved to '/data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/dxnn/standalone/bus_detected_20251106_101311_990.jpg' file.
 ==================================================
-Total object detections: 2
-Boxes tensor shape: torch.Size([2, 6])
-Confidence range: 0.878 ~ 0.914
-Class distribution: {0: 1, 8: 1}
+Total object detections: 5
+Boxes tensor shape: torch.Size([5, 6])
+Confidence range: 0.849 ~ 0.930
+Confidences >= 0.25: 5
+Class distribution: {np.int64(0): np.int64(4), np.int64(5): np.int64(1)}
+Conf 0.2~0.3: 0
+Conf 0.3~0.4: 0
+Conf 0.4~0.5: 0
+Conf 0.5~0.6: 0
+Conf 0.6~0.7: 0
+Conf 0.7~0.8: 0
+Conf 0.8~0.9: 2
+Conf >= 0.9: 3
+[bus] Total 5 objects detected.
+  1. bus: 0.93 - Position: (3, 226) ~ (801, 747)
+  2. person: 0.90 - Position: (224, 411) ~ (345, 865)
+  3. person: 0.90 - Position: (51, 406) ~ (249, 902)
+  4. person: 0.89 - Position: (666, 399) ~ (810, 877)
+  5. person: 0.85 - Position: (1, 555) ~ (81, 872)
 
-[boats] Total 2 objects detected.
-  1. person: 0.91 - Position: (221, 402) ~ (344, 857)
-  2. boat: 0.88 - Position: (90, 456) ~ (1259, 880)
-
-Detection result saved to 'runs/predict/onnx/standalone/boats_detected_20251021_143052_123.jpg' file.
---------------------------------------------------
-
+======================================================================
 PROCESSING SUMMARY
 ======================================================================
-Total images processed: 3
-Output directory: runs/predict/onnx/standalone
+Total images processed: 1
+Output directory: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/dxnn/standalone
 
 Saved files:
-  1. runs/predict/onnx/standalone/boats_detected_20251021_143052_123.jpg
-  2. runs/predict/onnx/standalone/bus_detected_20251021_143053_456.jpg
-  3. runs/predict/onnx/standalone/zidane_detected_20251021_143054_789.jpg
+  1. /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/dxnn/standalone/bus_detected_20251106_101311_990.jpg
 ======================================================================
 Processing completed successfully!
 ======================================================================
+```
+
+### 5. 비디오(Batch) 처리 실행 결과 예제 (predict_onnx_ultralytics_deepx_video.py)
+
+```plaintext
+Added custom ultralytics path: /data/home/dhyang/git/deepx_yolo/yolo11l/../lib/ultralytics
+Processing directory of images and videos.
+Letterbox mode: rect (preserve aspect ratio)
+Results will be saved in '/data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/onnx/ultralytics_deepx' folder.
+Found 0 image(s) and 3 video(s)
+--------------------------------------------------
+
+[VIDEO 1/3] Processing: dance-group2.mov
+--------------------------------------------------
+
+Processing video: dance-group2.mov
+Video properties: 1920x1080, 25 FPS, 764 frames
+Output video will be saved to: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/onnx/ultralytics_deepx/dance-group2_detected_20251106_094834_268.mp4
+Starting video processing with batch size: 12
+--------------------------------------------------
+Loading /data/home/dhyang/git/deepx_yolo/yolo11l/models/yolo11l.onnx for ONNX Runtime inference...
+Using ONNX Runtime 1.23.2 CPUExecutionProvider
+Processing frames 1-12/764 (1.6%) | Batch: 1.06s, 11.33 FPS | Cumulative: 11.33 FPS
+...
+Processing frames 745-756/764 (99.0%) | Batch: 0.77s, 15.51 FPS | Cumulative: 14.78 FPS
+
+Video processing completed!
+Processed 764/764 frames
+Total time: 60.28s, Pure inference time: 51.64s
+FPS (Overall): 12.68, FPS (Inference Only): 14.79
+Output video saved to: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/onnx/ultralytics_deepx/dance-group2_detected_20251106_094834_268.mp4
+
+[VIDEO 2/3] Processing: dogs.mp4
+--------------------------------------------------
+
+Processing video: dogs.mp4
+Video properties: 1920x1080, 30 FPS, 300 frames
+Output video will be saved to: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/onnx/ultralytics_deepx/dogs_detected_20251106_094934_544.mp4
+Starting video processing with batch size: 12
+--------------------------------------------------
+Loading /data/home/dhyang/git/deepx_yolo/yolo11l/models/yolo11l.onnx for ONNX Runtime inference...
+Using ONNX Runtime 1.23.2 CPUExecutionProvider
+Processing frames 1-12/300 (4.0%) | Batch: 1.00s, 12.01 FPS | Cumulative: 12.01 FPS
+...
+Processing frames 289-300/300 (100.0%) | Batch: 0.81s, 14.74 FPS | Cumulative: 14.49 FPS
+
+Video processing completed!
+Processed 300/300 frames
+Total time: 23.98s, Pure inference time: 20.70s
+FPS (Overall): 12.51, FPS (Inference Only): 14.49
+Output video saved to: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/onnx/ultralytics_deepx/dogs_detected_20251106_094934_544.mp4
+
+[VIDEO 3/3] Processing: dron-citry-road2.mov
+--------------------------------------------------
+
+Processing video: dron-citry-road2.mov
+Video properties: 1920x1080, 29 FPS, 210 frames
+Output video will be saved to: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/onnx/ultralytics_deepx/dron-citry-road2_detected_20251106_094958_523.mp4
+Starting video processing with batch size: 12
+--------------------------------------------------
+Loading /data/home/dhyang/git/deepx_yolo/yolo11l/models/yolo11l.onnx for ONNX Runtime inference...
+Using ONNX Runtime 1.23.2 CPUExecutionProvider
+Processing frames 1-12/210 (5.7%) | Batch: 0.98s, 12.19 FPS | Cumulative: 12.19 FPS
+...
+Processing frames 193-204/210 (97.1%) | Batch: 0.87s, 13.76 FPS | Cumulative: 14.52 FPS
+
+Video processing completed!
+Processed 210/210 frames
+Total time: 17.39s, Pure inference time: 14.43s
+FPS (Overall): 12.08, FPS (Inference Only): 14.56
+Output video saved to: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/onnx/ultralytics_deepx/dron-citry-road2_detected_20251106_094958_523.mp4
+
+================================================================================
+PROCESSING SUMMARY
+================================================================================
+Total files processed: 3
+Output directory: /data/home/dhyang/git/deepx_yolo/yolo11l/runs/predict/onnx/ultralytics_deepx
+
+================================================================================
+VIDEO PROCESSING STATISTICS
+================================================================================
+
+[1] dance-group2_detected_20251106_094834_268.mp4
+    Type: VIDEO
+    Batch Size:               12
+    Frames Processed:         764
+    Overall Processing Time:  60.28s
+    Pure Inference Time:      51.64s (85.7%)
+    FPS (Overall):            25.00
+    FPS (Inference Only):     14.79
+
+[2] dogs_detected_20251106_094934_544.mp4
+    Type: VIDEO
+    Batch Size:               12
+    Frames Processed:         300
+    Overall Processing Time:  23.98s
+    Pure Inference Time:      20.70s (86.3%)
+    FPS (Overall):            30.00
+    FPS (Inference Only):     14.49
+
+[3] dron-citry-road2_detected_20251106_094958_523.mp4
+    Type: VIDEO
+    Batch Size:               12
+    Frames Processed:         210
+    Overall Processing Time:  17.39s
+    Pure Inference Time:      14.43s (83.0%)
+    FPS (Overall):            29.00
+    FPS (Inference Only):     14.56
+
+================================================================================
+AGGREGATE STATISTICS (All Videos)
+================================================================================
+Total Files:                      3
+Batch Size:                       12
+Total Frames Processed:           1274
+Total Overall Processing Time:    101.640s
+Total Pure Inference Time:        86.770s (85.4%)
+Total FPS (Overall):              12.53
+Total FPS (Inference Only):       14.68
+
+================================================================================
+PERFORMANCE BREAKDOWN EXPLANATION
+================================================================================
+
+Total Processing Time Breakdown:
+  ├─ Pure Inference Time:  86.77s (85.4%)
+  │  ├─ Preprocessing:     (letterbox, normalization)
+  │  ├─ Inference:         (NPU/GPU execution)
+  │  └─ Postprocessing:    (NMS, coordinate scaling)
+  │
+  └─ Overhead Time:        14.87s (14.6%)
+     ├─ Video I/O:         (frame reading, video writing)
+     ├─ Visualization:     (drawing boxes, labels)
+     └─ Misc:              (batching, progress display)
+
+FPS Comparison:
+  • FPS (Inference Only): 14.68 FPS
+    → Pure model throughput (what the model can achieve)
+    → Measures only: preprocessing + inference + postprocessing
+
+  • FPS (Overall):        12.53 FPS
+    → Real-world application performance
+    → Includes all overheads: video I/O, visualization, etc.
+
+  • Performance Gap:      2.15 FPS (14.6% overhead)
+    → This gap represents non-inference operations
+    → Typical range: 20-30% for video processing applications
+
+================================================================================
+Processing completed successfully!
+================================================================================
 ```
 
 
@@ -414,12 +589,14 @@ python -c "from dx_engine import InferenceEngine; print('DEEPX OK')"
 
 3. **진행 경로**:
    ```
-   predict_onnx_standalone.py              → 전체 파이프라인 이해
-   predict_onnx_ultralytics_postprocess.py → 하이브리드 접근 방식 학습
-   predict_onnx_ultralytics_deepx.py       → Ultralytics DEEPX 통합 라이브러리 확인
-   predict_dxnn_standalone.py              → DEEPX 런타임 학습
-   predict_dxnn_ultralytics_postprocess.py → DEEPX + 검증된 후처리
-   predict_dxnn_ultralytics_deepx.py       → Ultralytics DEEPX 통합 라이브러리 확인
+   predict_onnx_standalone.py                  → 전체 파이프라인 이해
+   predict_onnx_ultralytics_postprocess.py     → 하이브리드 접근 방식 학습
+   predict_onnx_ultralytics_deepx.py           → Ultralytics DEEPX 통합 라이브러리 확인 (이미지)
+   predict_onnx_ultralytics_deepx_video.py     → Ultralytics DEEPX 비디오 처리
+   predict_dxnn_standalone.py                  → DEEPX 런타임 학습
+   predict_dxnn_ultralytics_postprocess.py     → DEEPX + 검증된 후처리
+   predict_dxnn_ultralytics_deepx.py           → Ultralytics DEEPX 통합 라이브러리 확인 (이미지)
+   predict_dxnn_ultralytics_deepx_video.py     → Ultralytics DEEPX 비디오 처리 (DXNN 가속)
    ```
 
 ### 코드 재사용
@@ -458,10 +635,12 @@ def scale_boxes()            # 좌표 변환
 | `ultralytics_deepx_lib_setup.py` | 사용자 정의 라이브러리 경로 구성 | - | 라이브러리 초기화 |
 | `predict_onnx_standalone.py` | ONNX 추론 (종속성 없음) | cv2, numpy, torch, onnxruntime | 학습, 사용자 정의 |
 | `predict_onnx_ultralytics_postprocess.py` | ONNX 추론 + Ultralytics 후처리 | cv2, numpy, torch, onnxruntime, ultralytics (후처리만) | 하이브리드 접근, 검증된 후처리 |
-| `predict_onnx_ultralytics_deepx.py` | ONNX 추론 (전체 라이브러리) | ultralytics (사용자 정의), cv2, numpy, torch | 빠른 프로토타이핑, 디버깅 |
+| `predict_onnx_ultralytics_deepx.py` | ONNX 추론 (이미지, 전체 라이브러리) | ultralytics (사용자 정의), cv2, numpy, torch | 빠른 프로토타이핑, 디버깅 |
+| `predict_onnx_ultralytics_deepx_video.py` | ONNX 추론 (비디오, 전체 라이브러리) | ultralytics (사용자 정의), cv2, numpy, torch | 비디오 처리, 프레임 단위 추론 |
 | `predict_dxnn_standalone.py` | DXNN 추론 (종속성 없음) | cv2, numpy, torch, dx-engine | 프로덕션, 최소 종속성 |
 | `predict_dxnn_ultralytics_postprocess.py` | DXNN 추론 + Ultralytics 후처리 | cv2, numpy, torch, dx-engine, ultralytics (후처리만) | DEEPX 가속 + 검증된 후처리 |
-| `predict_dxnn_ultralytics_deepx.py` | DXNN 추론 (전체 라이브러리) | ultralytics (사용자 정의), dx-engine | 가속화를 통한 개발 |
+| `predict_dxnn_ultralytics_deepx.py` | DXNN 추론 (이미지, 전체 라이브러리) | ultralytics (사용자 정의), dx-engine | 가속화를 통한 개발 |
+| `predict_dxnn_ultralytics_deepx_video.py` | DXNN 추론 (비디오, 전체 라이브러리) | ultralytics (사용자 정의), dx-engine | DXNN 가속 비디오 처리 |
 
 ### 출력 구조
 
@@ -478,11 +657,12 @@ yolo11l/runs/predict/
 │   │   └── debug/
 │   │       ├── input/                 # 전처리된 입력 시각화
 │   │       └── raw_output/            # 원시 모델 출력 (.npy)
-│   └── ultralytics_deepx/             # predict_onnx_ultralytics_deepx.py 출력
-│       ├── [input_image_name]_detected_[timestamp].jpg
+│   └── ultralytics_deepx/             # predict_onnx_ultralytics_deepx.py & _video.py 출력
+│       ├── [input_image_name]_detected_[timestamp].jpg      # 이미지 출력
+│       ├── [input_video_name]_detected_[timestamp].mp4      # 비디오 출력
 │       └── debug/
-│           ├── input/
-│           ├── raw_output/
+│           ├── input/                 # 전처리된 입력 시각화
+│           ├── raw_output/            # 원시 모델 출력 (.npy)
 │           └── origin_output/         # Ultralytics 네이티브 출력
 └── dxnn/
     ├── standalone/                    # predict_dxnn_standalone.py 출력
@@ -495,11 +675,12 @@ yolo11l/runs/predict/
     │   └── debug/
     │       ├── input/                 # 전처리된 입력 시각화
     │       └── raw_output/            # 원시 모델 출력 (.npy)
-    └── ultralytics_deepx/             # predict_dxnn_ultralytics_deepx.py 출력
-        ├── [input_image_name]_detected_[timestamp].jpg
+    └── ultralytics_deepx/             # predict_dxnn_ultralytics_deepx.py & _video.py 출력
+        ├── [input_image_name]_detected_[timestamp].jpg      # 이미지 출력
+        ├── [input_video_name]_detected_[timestamp].mp4      # 비디오 출력
         └── debug/
-            ├── input/
-            ├── raw_output/
+            ├── input/                 # 전처리된 입력 시각화
+            ├── raw_output/            # 원시 모델 출력 (.npy)
             └── origin_output/         # Ultralytics 네이티브 출력
     
 ```
@@ -523,6 +704,71 @@ python util/compare_raw_outputs.py \
     runs/predict/dxnn/standalone/debug/raw_output/raw_output_[timestamp].npy
 ```
 
+### ONNX 모델 동적 형상 확인
+
+ONNX 모델이 동적 형상(dynamic shape)을 지원하는지 확인하는 유틸리티:
+
+```bash
+# 기본 모델 확인
+python util/check_onnx_dynamic.py
+
+# 특정 모델 확인
+python util/check_onnx_dynamic.py --model yolo11l/models/yolo11l.onnx
+python util/check_onnx_dynamic.py -m yolo11l-seg/models/yolo11l-seg.onnx
+```
+
+**출력 예시:**
+```
+================================================================================
+ONNX Model Analysis: yolo11l/models/yolo11l.onnx
+================================================================================
+
+📥 Input Information:
+--------------------------------------------------------------------------------
+
+Input name: images
+Shape:
+  [0] Dynamic size: batch ⭐
+  [1] Fixed size: 3
+  [2] Dynamic size: height ⭐
+  [3] Dynamic size: width ⭐
+Full shape: ['batch', '3', 'height', 'width']
+
+================================================================================
+📤 Output Information:
+--------------------------------------------------------------------------------
+
+Output name: output0
+Shape:
+  [0] Dynamic size: batch ⭐
+  [1] Fixed size: 84
+  [2] Dynamic size: anchors ⭐
+Full shape: ['batch', '84', 'anchors']
+
+================================================================================
+📊 Analysis Results:
+--------------------------------------------------------------------------------
+✅ This model supports dynamic shapes (dynamic=True).
+
+Dynamic dimensions:
+  - Input: Contains dynamic shape
+  - Output: Contains dynamic shape
+
+Available features:
+  ✓ Batch processing available (BATCH_SIZE > 1)
+  ✓ Various input sizes supported
+  ✓ Runtime shape adjustment possible
+================================================================================
+```
+
+**동적 형상(Dynamic Shape)이란?**
+- ✅ **동적 모델**: 입력 크기를 런타임에 변경 가능 (예: 640x640, 480x640, 1024x1024)
+- ❌ **고정 모델**: 입력 크기가 고정됨 (예: 항상 640x640만 가능)
+
+**사용 시기:**
+- ONNX 모델 export 후 동적 형상 지원 확인
+- rect=True 모드 사용 가능 여부 확인 (동적 형상 필요)
+- 배치 처리 가능 여부 확인
 
 ### 디버그 기능
 

@@ -131,12 +131,20 @@ MODEL_PATH = PROJECT_ROOT / MODEL_NAME / 'models' / MODEL_FILE
 # SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images' / 'bus.jpg'                  # for image file
 # SOURCE_PATH = PROJECT_ROOT / 'assets' / 'images'                              # for image directory
 # SOURCE_PATH = PROJECT_ROOT / 'assets' / 'videos' / 'dron-citry-road2.mov'     # for video file
-# SOURCE_PATH = PROJECT_ROOT / 'assets' / 'videos'                              # for video directory
-SOURCE_PATH = PROJECT_ROOT / 'assets'                                         # for image and video directory
+SOURCE_PATH = PROJECT_ROOT / 'assets' / 'videos'                              # for video directory
+# SOURCE_PATH = PROJECT_ROOT / 'assets'                                         # for image and video directory
 OUTPUT_SUBDIR = CURRENT_DIR / 'runs' / 'predict' / MODEL_EXTENSION / "ultralytics_deepx"
 DEBUG_OUTPUT_DIR = OUTPUT_SUBDIR / 'debug'   # Directory to save debug outputs
 DEBUG_ORIGIN_OUTPUT_DIR = DEBUG_OUTPUT_DIR / 'origin_output'
 OUTPUT_DIR = OUTPUT_SUBDIR  # Directory to save results
+
+INPUT_SIZE = 640
+
+# Letterbox preprocessing mode
+# False: Square padding (e.g., 640x640) - matches Ultralytics rect=False
+# True: Rectangular, preserve aspect ratio (e.g., 480x640) - matches Ultralytics rect=True
+# NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+RECT_OPT = True
 
 # COCO class names (based on dataset that YOLOv11 was trained on)
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
@@ -247,7 +255,7 @@ def analyze_results(result, filename):
         print(f"  {i+1}. {class_name}: {score:.2f} - Position: ({x1:.0f}, {y1:.0f}) ~ ({x2:.0f}, {y2:.0f})")
 
 
-def process_frame_batch(model, frame_batch, video_writer, save, show):
+def process_frame_batch(model, frame_batch, video_writer, save, show, debug=False, rect=True):
     """
     Process a batch of frames through the model and handle results.
     
@@ -257,6 +265,9 @@ def process_frame_batch(model, frame_batch, video_writer, save, show):
         video_writer: VideoWriter object for saving output
         save: Whether to save output video
         show: Whether to display output
+        rect: Enable rectangular inference (preserve aspect ratio)
+              - True: Preserve aspect ratio (e.g., 480x640) - default
+              - False: Force square padding (e.g., 640x640)
         
     Returns:
         tuple: (Number of frames processed, inference time in seconds)
@@ -280,7 +291,7 @@ def process_frame_batch(model, frame_batch, video_writer, save, show):
     # 3. Postprocessing (NMS, coordinate scaling, Results creation)
     # ============================================================================
     inference_start = time.perf_counter()
-    results = model(source=frame_batch, save=False, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR, imgsz=640, rect=False)
+    results = model(source=frame_batch, save=False, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR, imgsz=INPUT_SIZE, rect=rect, verbose=debug)
     inference_time = time.perf_counter() - inference_start
     # ============================================================================
     # INFERENCE TIME MEASUREMENT END
@@ -308,7 +319,7 @@ def process_frame_batch(model, frame_batch, video_writer, save, show):
     return processed_count, inference_time
 
 
-def run_video_inference(model_path, video_path, output_dir, debug=False, save=True, show=False):
+def run_video_inference(model_path, video_path, output_dir, debug=False, save=True, show=False, rect=True):
     """
     Run complete inference on video using specified backend.
     
@@ -319,6 +330,9 @@ def run_video_inference(model_path, video_path, output_dir, debug=False, save=Tr
         debug: Enable debug mode (saves intermediate outputs)
         save: Save output video with detection
         show: Display output video
+        rect: Enable rectangular inference (preserve aspect ratio)
+              - True: Preserve aspect ratio (e.g., 480x640) - default
+              - False: Force square padding (e.g., 640x640)
     
     Returns:
         tuple: (output_path, statistics_dict) if successful, (None, None) otherwise
@@ -364,7 +378,8 @@ def run_video_inference(model_path, video_path, output_dir, debug=False, save=Tr
         model = YOLO(model=model_path, task='detect')
         
         # Debug: Verify model class names
-        print("ONNX Model names:", model.names)
+        if debug:
+            print("ONNX Model names:", model.names)
         
         # Open video file
         cap = cv2.VideoCapture(video_path)
@@ -402,7 +417,7 @@ def run_video_inference(model_path, video_path, output_dir, debug=False, save=Tr
             if not success:
                 # Process remaining frames in batch if any
                 if frame_batch:
-                    count, inf_time = process_frame_batch(model, frame_batch, video_writer, save, show)
+                    count, inf_time = process_frame_batch(model, frame_batch, video_writer, save, show, rect=rect, debug=debug)
                     if count == -1:  # User interrupted
                         break
                     processed_frames += count
@@ -420,7 +435,7 @@ def run_video_inference(model_path, video_path, output_dir, debug=False, save=Tr
                 # 1. Preprocessing: letterbox, normalization, channel conversion
                 # 2. Inference: Runtime execution via AutoBackend (batch processing)
                 # 3. Postprocessing: NMS, mask generation, coordinate scaling, Results object creation
-                count, inf_time = process_frame_batch(model, frame_batch, video_writer, save, show)
+                count, inf_time = process_frame_batch(model, frame_batch, video_writer, save, show, rect=rect, debug=debug)
                 if count == -1:  # User interrupted
                     break
                 processed_frames += count
@@ -482,8 +497,7 @@ def run_video_inference(model_path, video_path, output_dir, debug=False, save=Tr
         traceback.print_exc()
         return None, None
 
-
-def run_inference(model_path, image_path, output_dir, debug=False, save=True, show=False):
+def run_inference(model_path, image_path, output_dir, debug=False, save=True, show=False, rect=True):
     """
     Run complete inference using specified backend.
     
@@ -494,6 +508,9 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         debug: Enable debug mode (saves intermediate outputs)
         save: Save output image with detections
         show: Display output image
+        rect: Enable rectangular inference (preserve aspect ratio)
+              - True: Preserve aspect ratio (e.g., 480x640) - default
+              - False: Force square padding (e.g., 640x640)
     
     Returns:
         tuple: (output_path, statistics_dict) if successful, (None, None) otherwise
@@ -522,7 +539,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         model = YOLO(model=model_path, task='detect')
 
         # Debug: Verify model class names
-        print("ONNX Model names:", model.names)
+        if debug:
+            print("ONNX Model names:", model.names)
 
         # ============================================================================
         # INFERENCE TIME MEASUREMENT START
@@ -533,7 +551,7 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         # 3. Postprocessing (NMS, coordinate scaling, Results creation)
         # ============================================================================
         inference_start = time.perf_counter()
-        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR)
+        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR, imgsz=INPUT_SIZE, rect=rect, verbose=debug)
         inference_time = time.perf_counter() - inference_start
         # ============================================================================
         # INFERENCE TIME MEASUREMENT END
@@ -550,7 +568,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         draw_detections(image_path, result, output_path, save=save, show=show)
 
         # Print analysis result
-        analyze_results(result, filename)
+        if debug:
+            analyze_results(result, filename)
 
         # ============================================================================
         # TOTAL PROCESSING TIME MEASUREMENT END
@@ -558,7 +577,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         overall_time = time.perf_counter() - start_time
         
         # Print timing statistics
-        print(f"\n[Timing] Inference: {inference_time:.3f}s | Total: {overall_time:.3f}s")
+        if debug:
+            print(f"\n[Timing] Inference: {inference_time:.3f}s | Total: {overall_time:.3f}s")
         
         # Prepare statistics dictionary
         stats = {
@@ -650,9 +670,11 @@ def process_media_file(file_path, model_path, output_dir, file_idx, total_files)
     print("-" * 50)
     
     if is_video:
-        result_path, stats = run_video_inference(model_path, str(file_path), output_dir, debug=DEBUG_MODE)
+        # NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+        result_path, stats = run_video_inference(model_path, str(file_path), output_dir, debug=(DEBUG_MODE == 1), rect=RECT_OPT)
     else:
-        result_path, stats = run_inference(model_path, str(file_path), output_dir, debug=DEBUG_MODE)
+        # NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+        result_path, stats = run_inference(model_path, str(file_path), output_dir, debug=(DEBUG_MODE == 1), rect=RECT_OPT)
     
     return result_path, stats, is_video
 
@@ -686,6 +708,7 @@ def main():
     else:
         print("Processing directory of images and videos.")
     
+    print(f"Letterbox mode: {'rect (preserve aspect ratio)' if RECT_OPT else 'square padding'}")
     print(f"Results will be saved in '{OUTPUT_DIR}' folder.")
     print(f"Found {len(image_files)} image(s) and {len(video_files)} video(s)")
     print("-" * 50)

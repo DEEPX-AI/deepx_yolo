@@ -107,6 +107,14 @@ DEBUG_OUTPUT_DIR = OUTPUT_SUBDIR / 'debug'   # Directory to save debug outputs
 DEBUG_ORIGIN_OUTPUT_DIR = DEBUG_OUTPUT_DIR / 'origin_output'
 OUTPUT_DIR = OUTPUT_SUBDIR  # Directory to save results
 
+INPUT_SIZE = 640
+
+# Letterbox preprocessing mode
+# False: Square padding (e.g., 640x640) - matches Ultralytics rect=False
+# True: Rectangular, preserve aspect ratio (e.g., 480x640) - matches Ultralytics rect=True
+# NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+RECT_OPT = True
+
 # COCO class names (based on dataset that YOLOv11 was trained on)
 CLASSES = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
            'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
@@ -215,7 +223,7 @@ def analyze_results(result, filename):
         
         print(f"  {i+1}. {class_name}: {score:.2f} - Position: ({x1:.0f}, {y1:.0f}) ~ ({x2:.0f}, {y2:.0f})")
 
-def run_inference(model_path, image_path, output_dir, debug=False, save=True, show=False):
+def run_inference(model_path, image_path, output_dir, debug=False, save=True, show=False, rect=True):
     """
     Run complete inference using specified backend.
     
@@ -226,6 +234,9 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         debug: Enable debug mode (saves intermediate outputs)
         save: Save output image with detections
         show: Display output image
+        rect: Enable rectangular inference (preserve aspect ratio)
+              - True: Preserve aspect ratio (e.g., 480x640) - default
+              - False: Force square padding (e.g., 640x640)
     
     Returns:
         tuple: (output_path, statistics_dict) if successful, (None, None) otherwise
@@ -254,7 +265,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         model = YOLO(model=model_path, task='detect')
 
         # Debug: Verify model class names
-        print("ONNX Model names:", model.names)
+        if debug:
+            print("ONNX Model names:", model.names)
 
         # ============================================================================
         # INFERENCE TIME MEASUREMENT START
@@ -265,7 +277,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         # 3. Postprocessing (NMS, coordinate scaling, Results creation)
         # ============================================================================
         inference_start = time.perf_counter()
-        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR)
+        # NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+        results = model(source=image_path, save=save, project=CURRENT_DIR, name=DEBUG_ORIGIN_OUTPUT_DIR, imgsz=INPUT_SIZE, rect=rect, verbose=debug)
         inference_time = time.perf_counter() - inference_start
         # ============================================================================
         # INFERENCE TIME MEASUREMENT END
@@ -282,7 +295,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         draw_detections(image_path, result, output_path, save=save, show=show)
 
         # Print analysis result
-        analyze_results(result, filename)
+        if debug:
+            analyze_results(result, filename)
 
         # ============================================================================
         # TOTAL PROCESSING TIME MEASUREMENT END
@@ -290,7 +304,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         overall_time = time.perf_counter() - start_time
         
         # Print timing statistics
-        print(f"\n[Timing] Inference: {inference_time:.3f}s | Total: {overall_time:.3f}s")
+        if debug:
+            print(f"\n[Timing] Inference: {inference_time:.3f}s | Total: {overall_time:.3f}s")
         
         # Prepare statistics dictionary
         stats = {
@@ -320,16 +335,18 @@ def main():
     # Check if source is file or directory
     if source_path.is_file():
         print("Processing single image file.")
+        print(f"Letterbox mode: {'rect (preserve aspect ratio)' if RECT_OPT else 'square padding'}")
         print(f"Results will be saved in '{OUTPUT_DIR}' folder.")
         print("-" * 50)
-
-        result_path, stats = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=DEBUG_MODE)
+        # NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+        result_path, stats = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=(DEBUG_MODE == 1), rect=RECT_OPT)
         if result_path:
             saved_files.append(result_path)
             image_statistics[Path(result_path).name] = stats
 
     elif source_path.is_dir():
         print("Processing directory of images.")
+        print(f"Letterbox mode: {'rect (preserve aspect ratio)' if RECT_OPT else 'square padding'}")
         print(f"Results will be saved in '{OUTPUT_DIR}' folder.")
         print("-" * 50)
         
@@ -349,7 +366,8 @@ def main():
         for idx, image_path in enumerate(image_files, 1):
             print(f"\n[{idx}/{len(image_files)}] Processing: {image_path.name}")
             print("-" * 50)
-            result_path, stats = run_inference(MODEL_PATH, str(image_path), OUTPUT_DIR, debug=True)
+            # NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+            result_path, stats = run_inference(MODEL_PATH, str(image_path), OUTPUT_DIR, debug=(DEBUG_MODE == 1), rect=RECT_OPT)
             if result_path:
                 saved_files.append(result_path)
                 image_statistics[Path(result_path).name] = stats

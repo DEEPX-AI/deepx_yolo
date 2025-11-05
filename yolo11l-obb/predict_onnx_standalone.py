@@ -57,7 +57,14 @@ OUTPUT_DIR = OUTPUT_SUBDIR  # Directory to save results
 # Detection parameters (Ultralytics defaults)
 CONFIDENCE_THRESHOLD = 0.25
 IOU_THRESHOLD = 0.45
+
 INPUT_SIZE = 1024
+
+# Letterbox preprocessing mode
+# False: Square padding (e.g., 640x640) - matches Ultralytics rect=False
+# True: Rectangular, preserve aspect ratio (e.g., 480x640) - matches Ultralytics rect=True
+# NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+RECT_OPT = True
 
 # DOTAv1.0 class names (dataset that YOLOv11-obb was trained on)
 CLASSES = ['plane', 'ship', 'storage-tank', 'baseball-diamond', 'tennis-court', 'basketball-court', 
@@ -601,10 +608,27 @@ def non_max_suppression(
 # End of ported functions
 # ============================================================================
 
-def letterbox(image, new_shape=(1024, 1024), color=(114, 114, 114), auto=False, scaleFill=False, scaleup=True, stride=32):
+def letterbox(image, new_shape=(640, 640), color=(114, 114, 114), auto=False, scaleFill=False, scaleup=True, stride=32, rect=True):
     """
     Resize and pad image while meeting stride-multiple constraints.
     Custom implementation based on Ultralytics letterbox function.
+    
+    Args:
+        image: Input image (numpy array)
+        new_shape: Target size as (height, width) or int
+        color: Padding color (RGB)
+        auto: Enable stride-multiple auto-padding (minimum padding)
+        scaleFill: Stretch image to fill new_shape (no padding, distorts aspect ratio)
+        scaleup: Allow upscaling of image
+        stride: Stride value for auto padding (default: 32)
+        rect: Enable rectangular inference (preserve aspect ratio, no square padding)
+              - True: Preserve aspect ratio (e.g., 480x640 for 640x480 input) - default
+              - False: Force square padding (e.g., 640x640)
+    
+    Returns:
+        image: Preprocessed image
+        ratio: Scaling ratio as (ratio_w, ratio_h)
+        (dw, dh): Padding as (pad_width, pad_height)
     """
     shape = image.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -621,11 +645,18 @@ def letterbox(image, new_shape=(1024, 1024), color=(114, 114, 114), auto=False, 
     dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]
 
     if auto:
+        # Minimum padding to meet stride-multiple constraints
         dw, dh = np.mod(dw, stride), np.mod(dh, stride)
     elif scaleFill:
+        # Stretch to fill (no padding, distorts aspect ratio)
         dw, dh = 0.0, 0.0
         new_unpad = (new_shape[1], new_shape[0])
         ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]
+    elif rect:
+        # Rectangular inference: preserve aspect ratio, no square padding
+        # Round padding to stride multiple for efficient processing
+        dw = np.mod(dw, stride)
+        dh = np.mod(dh, stride)
 
     dw /= 2
     dh /= 2
@@ -637,10 +668,25 @@ def letterbox(image, new_shape=(1024, 1024), color=(114, 114, 114), auto=False, 
     image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
     return image, ratio, (dw, dh)
 
-def preprocess_image(image_path, imgsz=1024):
+def preprocess_image(image_path, imgsz=640, debug=False, rect=True):
     """
     Read image and preprocess it for model input.
     Custom preprocessing implementation without Ultralytics dependencies.
+    
+    Args:
+        image_path: Path to input image
+        imgsz: Target image size (default: 640)
+        debug: Enable debug output
+        rect: Enable rectangular inference (preserve aspect ratio)
+              - True: Preserve aspect ratio (e.g., 480x640) - default
+              - False: Force square padding (e.g., 640x640)
+    
+    Returns:
+        processed_image: Preprocessed tensor with shape (1, 3, H, W)
+        image: Original image (BGR)
+        ratio: Scaling ratio
+        (dw, dh): Padding
+        preproc_shape: Actual preprocessing shape (H, W) after letterbox
     """
     image = cv2.imread(image_path)
     if image is None:
@@ -649,10 +695,13 @@ def preprocess_image(image_path, imgsz=1024):
     original_height, original_width = image.shape[:2]
     
     # Apply letterbox preprocessing
-    processed_image, ratio, (dw, dh) = letterbox(image, new_shape=(imgsz, imgsz))
+    processed_image_bgr, ratio, (dw, dh) = letterbox(image, new_shape=(imgsz, imgsz), rect=rect)
+    
+    # Get actual preprocessing shape BEFORE normalization
+    preproc_shape = processed_image_bgr.shape[:2]  # (H, W) after letterbox
     
     # Convert to RGB and normalize
-    processed_image = cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB)
+    processed_image = cv2.cvtColor(processed_image_bgr, cv2.COLOR_BGR2RGB)
     processed_image = processed_image.transpose(2, 0, 1)  # HWC to CHW
     processed_image = np.ascontiguousarray(processed_image)
     processed_image = processed_image.astype(np.float32) / 255.0
@@ -660,15 +709,19 @@ def preprocess_image(image_path, imgsz=1024):
     # Add batch dimension
     processed_image = np.expand_dims(processed_image, axis=0)
     
-    print(f"Debug info:")
-    print(f"  Original size: {original_width}x{original_height}")
-    print(f"  Ratio: {ratio}")
-    print(f"  Padding (dw, dh): {(dw, dh)}")
-    print(f"  Input tensor shape: {processed_image.shape}")
-    print(f"  Input tensor range: [{processed_image.min():.3f}, {processed_image.max():.3f}]")
-    return processed_image, image, ratio, (dw, dh), (original_width, original_height)
+    if debug:
+        print(f"Debug info:")
+        print(f"  Original size: {original_width}x{original_height}")
+        print(f"  Letterbox mode: {'rect (preserve aspect ratio)' if rect else 'square padding'}")
+        print(f"  Preprocessing shape: {preproc_shape}")
+        print(f"  Ratio: {ratio}")
+        print(f"  Padding (dw, dh): {(dw, dh)}")
+    print(f"\n[Preprocess] Input tensor shape: {processed_image.shape}")
+    print(f"[Preprocess]  Preprocessing shape (H, W): {preproc_shape}")
+    print(f"[Preprocess]  Input tensor range: [{processed_image.min():.3f}, {processed_image.max():.3f}]")
+    return processed_image, image, ratio, (dw, dh), preproc_shape
 
-def postprocess_output(preds, orig_img):
+def postprocess_output(preds, orig_img, preproc_shape):
     """
     Postprocess Model output using ported utilities.
     Uses ported non_max_suppression and coordinate scaling functions for OBB.
@@ -722,7 +775,7 @@ def postprocess_output(preds, orig_img):
     pred = results[0]  # [num_detections, 7] = [x, y, w, h, conf, cls, angle]
 
     # Create pseudo preprocessed image shape for scale_boxes
-    preproc_shape = (INPUT_SIZE, INPUT_SIZE)
+    print(f"[Postprocess] Using preprocessing shape: {preproc_shape}")
 
     # Extract components
     # OBB format from NMS: [x, y, w, h, conf, cls, angle]
@@ -881,7 +934,7 @@ def run_inference_using_onnx(model_path, input_tensor):
 
     return outputs
 
-def run_inference(model_path, image_path, output_dir, debug=False, save=True, show=False):
+def run_inference(model_path, image_path, output_dir, debug=False, save=True, show=False, rect=True):
     """
     Run complete inference using specified backend.
     
@@ -892,6 +945,9 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         debug: Enable debug mode (saves intermediate outputs)
         save: Save output image with detections
         show: Display output image
+        rect: Enable rectangular inference (preserve aspect ratio)
+              - True: Preserve aspect ratio (e.g., 480x640) - default
+              - False: Force square padding (e.g., 640x640)
     
     Returns:
         str: Path to output image if successful, None otherwise
@@ -906,7 +962,7 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         # 1. Preprocess
-        input_tensor, orig_img, ratio, pad, orig_shape = preprocess_image(image_path, INPUT_SIZE)
+        input_tensor, orig_img, ratio, pad, preproc_shape = preprocess_image(image_path, INPUT_SIZE, debug=debug, rect=rect)
 
         # Debug: Visualize preprocessed input tensor
         if debug:
@@ -932,7 +988,7 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
                 print(f"Inference Raw output saved to: {raw_output_path}")
 
         # 3. Post-processing
-        result = postprocess_output(preds, orig_img)
+        result = postprocess_output(preds, orig_img, preproc_shape)
 
         # 4. Visualization and analysis
         filename = Path(image_path).stem
@@ -943,7 +999,8 @@ def run_inference(model_path, image_path, output_dir, debug=False, save=True, sh
         draw_detections(image_path, result, output_path, save=save, show=show)
 
         # Print analysis result
-        analyze_results(result, filename)
+        if debug:
+            analyze_results(result, filename)
 
         return output_path
 
@@ -1010,15 +1067,17 @@ def main():
     # Check if source is file or directory
     if source_path.is_file():
         print("Processing single image file.")
+        print(f"Letterbox mode: {'rect (preserve aspect ratio)' if RECT_OPT else 'square padding'}")
         print(f"Results will be saved in '{OUTPUT_DIR}' folder.")
         print("-" * 50)
-
-        result_path = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=DEBUG_MODE)
+        # NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+        result_path = run_inference(MODEL_PATH, str(source_path), OUTPUT_DIR, debug=(DEBUG_MODE == 1), rect=RECT_OPT)
         if result_path:
             saved_files.append(result_path)
 
     elif source_path.is_dir():
         print("Processing directory of images.")
+        print(f"Letterbox mode: {'rect (preserve aspect ratio)' if RECT_OPT else 'square padding'}")
         print(f"Results will be saved in '{OUTPUT_DIR}' folder.")
         print("-" * 50)
         
@@ -1038,7 +1097,8 @@ def main():
         for idx, image_path in enumerate(image_files, 1):
             print(f"\n[{idx}/{len(image_files)}] Processing: {image_path.name}")
             print("-" * 50)
-            result_path = run_inference(MODEL_PATH, str(image_path), OUTPUT_DIR, debug=True)
+            # NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
+            result_path = run_inference(MODEL_PATH, str(image_path), OUTPUT_DIR, debug=(DEBUG_MODE == 1), rect=RECT_OPT)
             if result_path:
                 saved_files.append(result_path)
     else:
