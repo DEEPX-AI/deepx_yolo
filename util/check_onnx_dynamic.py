@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-ONNX 모델의 동적 형상(dynamic shape) 지원 여부를 확인하는 스크립트
+Script to check whether an ONNX model supports dynamic shape
 
-사용법:
+Usage:
     python check_onnx_dynamic.py
     python check_onnx_dynamic.py --model models/yolo11l.onnx
 """
@@ -14,20 +14,20 @@ from pathlib import Path
 
 def check_onnx_dynamic(model_path):
     """
-    ONNX 모델의 입출력 형상을 분석하여 동적 형상 지원 여부를 확인합니다.
+    Analyze ONNX model input/output shapes to check dynamic shape support.
     
     Args:
-        model_path: ONNX 모델 파일 경로
+        model_path: Path to ONNX model file
     """
     print(f"\n{'='*80}")
-    print(f"ONNX 모델 분석: {model_path}")
+    print(f"ONNX Model Analysis: {model_path}")
     print(f"{'='*80}\n")
     
-    # ONNX 모델 로드
+    # Load ONNX model
     model = onnx.load(model_path)
     
-    # 입력 정보 분석
-    print("📥 입력(Input) 정보:")
+    # Analyze input information
+    print("📥 Input Information:")
     print("-" * 80)
     
     has_dynamic_input = False
@@ -35,31 +35,31 @@ def check_onnx_dynamic(model_path):
         name = input_tensor.name
         shape = input_tensor.type.tensor_type.shape
         
-        print(f"\n입력 이름: {name}")
-        print(f"형상:")
+        print(f"\nInput name: {name}")
+        print(f"Shape:")
         
         dims = []
         for i, dim in enumerate(shape.dim):
             if dim.HasField('dim_value'):
-                # 고정 크기
+                # Fixed size
                 dim_value = dim.dim_value
                 dims.append(str(dim_value))
-                print(f"  [{i}] 고정 크기: {dim_value}")
+                print(f"  [{i}] Fixed size: {dim_value}")
             elif dim.HasField('dim_param'):
-                # 동적 크기
+                # Dynamic size
                 dim_param = dim.dim_param
                 dims.append(f"'{dim_param}'")
                 has_dynamic_input = True
-                print(f"  [{i}] 동적 크기: {dim_param} ⭐")
+                print(f"  [{i}] Dynamic size: {dim_param} ⭐")
             else:
                 dims.append("unknown")
-                print(f"  [{i}] 알 수 없음")
+                print(f"  [{i}] Unknown")
         
-        print(f"전체 형상: [{', '.join(dims)}]")
+        print(f"Full shape: [{', '.join(dims)}]")
     
-    # 출력 정보 분석
+    # Analyze output information
     print(f"\n{'='*80}")
-    print("📤 출력(Output) 정보:")
+    print("📤 Output Information:")
     print("-" * 80)
     
     has_dynamic_output = False
@@ -67,55 +67,55 @@ def check_onnx_dynamic(model_path):
         name = output_tensor.name
         shape = output_tensor.type.tensor_type.shape
         
-        print(f"\n출력 이름: {name}")
-        print(f"형상:")
+        print(f"\nOutput name: {name}")
+        print(f"Shape:")
         
         dims = []
         for i, dim in enumerate(shape.dim):
             if dim.HasField('dim_value'):
-                # 고정 크기
+                # Fixed size
                 dim_value = dim.dim_value
                 dims.append(str(dim_value))
-                print(f"  [{i}] 고정 크기: {dim_value}")
+                print(f"  [{i}] Fixed size: {dim_value}")
             elif dim.HasField('dim_param'):
-                # 동적 크기
+                # Dynamic size
                 dim_param = dim.dim_param
                 dims.append(f"'{dim_param}'")
                 has_dynamic_output = True
-                print(f"  [{i}] 동적 크기: {dim_param} ⭐")
+                print(f"  [{i}] Dynamic size: {dim_param} ⭐")
             else:
                 dims.append("unknown")
-                print(f"  [{i}] 알 수 없음")
+                print(f"  [{i}] Unknown")
         
-        print(f"전체 형상: [{', '.join(dims)}]")
+        print(f"Full shape: [{', '.join(dims)}]")
     
-    # 결과 요약
+    # Summary of results
     print(f"\n{'='*80}")
-    print("📊 분석 결과:")
+    print("📊 Analysis Results:")
     print("-" * 80)
     
     has_dynamic = has_dynamic_input or has_dynamic_output
     
     if has_dynamic:
-        print("✅ 이 모델은 동적 형상(dynamic=True)을 지원합니다.")
-        print("\n동적 차원:")
+        print("✅ This model supports dynamic shapes (dynamic=True).")
+        print("\nDynamic dimensions:")
         if has_dynamic_input:
-            print("  - 입력: 동적 형상 포함")
+            print("  - Input: Contains dynamic shape")
         if has_dynamic_output:
-            print("  - 출력: 동적 형상 포함")
-        print("\n사용 가능한 기능:")
-        print("  ✓ 배치 처리 가능 (BATCH_SIZE > 1)")
-        print("  ✓ 다양한 입력 크기 처리 가능")
-        print("  ✓ 런타임에 형상 조정 가능")
+            print("  - Output: Contains dynamic shape")
+        print("\nAvailable features:")
+        print("  ✓ Batch processing available (BATCH_SIZE > 1)")
+        print("  ✓ Various input sizes supported")
+        print("  ✓ Runtime shape adjustment possible")
     else:
-        print("❌ 이 모델은 고정 형상(dynamic=False)을 사용합니다.")
-        print("\n제약사항:")
-        print("  ✗ 배치 처리 불가 (BATCH_SIZE = 1 고정)")
-        print("  ✗ 고정된 입력 크기만 처리 가능")
-        print("  ✗ 런타임 형상 변경 불가")
-        print("\n재 export 방법:")
-        print("  1. export_onnx.py에서 dynamic=True로 변경")
-        print("  2. python export_onnx.py 실행")
+        print("❌ This model uses fixed shapes (dynamic=False).")
+        print("\nLimitations:")
+        print("  ✗ Batch processing unavailable (BATCH_SIZE = 1 fixed)")
+        print("  ✗ Only fixed input size supported")
+        print("  ✗ Runtime shape changes not possible")
+        print("\nHow to re-export:")
+        print("  1. Change dynamic=True in export_onnx.py")
+        print("  2. Run: python export_onnx.py")
     
     print(f"{'='*80}\n")
     
@@ -123,9 +123,9 @@ def check_onnx_dynamic(model_path):
 
 
 def main():
-    """메인 함수"""
+    """Main function"""
     parser = argparse.ArgumentParser(
-        description="ONNX 모델의 동적 형상 지원 여부 확인",
+        description="Check ONNX model dynamic shape support",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -133,24 +133,24 @@ def main():
         '--model', '-m',
         type=str,
         default='models/yolo11l.onnx',
-        help='ONNX 모델 파일 경로 (기본값: models/yolo11l.onnx)'
+        help='Path to ONNX model file (default: models/yolo11l.onnx)'
     )
     
     args = parser.parse_args()
     
-    # 현재 스크립트 위치 기준으로 경로 설정
+    # Set path based on current script location
     # script_dir = Path(__file__).parent
     model_path = Path(args.model)
     
     if not model_path.exists():
-        print(f"❌ 오류: 모델 파일을 찾을 수 없습니다: {model_path}")
-        print(f"   파일이 존재하는지 확인해주세요.")
+        print(f"❌ Error: Model file not found: {model_path}")
+        print(f"   Please check if the file exists.")
         return
     
-    # 모델 분석
+    # Analyze model
     is_dynamic = check_onnx_dynamic(str(model_path))
     
-    # 종료 코드 반환 (스크립트에서 활용 가능)
+    # Return exit code (can be used in scripts)
     exit(0 if is_dynamic else 1)
 
 

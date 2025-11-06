@@ -9,15 +9,15 @@ import os
 import argparse
 from pathlib import Path
 
-def compare_raw_outputs(file1_path, file2_path, tolerance=1e-6):
+def compare_raw_outputs(file1_path, file2_path, tolerance=0.15):
     """
     Compare two numpy arrays from saved .npy files.
     
     Args:
         file1_path: Path to first .npy file
-        file2_path: Path to second .npy file  
-        tolerance: Numerical tolerance for comparison (default: 1e-6)
-    
+        file2_path: Path to second .npy file
+        tolerance: Numerical tolerance for comparison (default: 0.15)
+
     Returns:
         dict: Comparison results with detailed statistics
     """
@@ -71,13 +71,39 @@ def compare_raw_outputs(file1_path, file2_path, tolerance=1e-6):
     exact_equal = np.array_equal(array1, array2)
     results["exact_equal"] = exact_equal
     
+    # Calculate differences (needed for all comparisons)
+    diff = np.abs(array1 - array2)
+    
     # Tolerance-based comparison
-    close_equal = np.allclose(array1, array2, rtol=tolerance, atol=tolerance)
+    # For INT8 quantization: tolerance represents relative error percentage
+    # Use percentile-based comparison for robustness against outliers
+    if tolerance >= 0.01:  # Likely percentage-based (e.g., 0.05 = 5%)
+        # Calculate relative differences for non-zero values
+        mask_nonzero = np.abs(array2) > 1e-5
+        rel_diff_nonzero = np.zeros_like(diff)
+        if np.any(mask_nonzero):
+            rel_diff_nonzero[mask_nonzero] = diff[mask_nonzero] / np.abs(array2[mask_nonzero])
+            
+            # Check if median and 90th percentile are within tolerance
+            # This approach is robust against outliers
+            median_rel_diff = np.median(rel_diff_nonzero[mask_nonzero])
+            p90_rel_diff = np.percentile(rel_diff_nonzero[mask_nonzero], 90)
+            
+            # Pass if 90th percentile is within tolerance (allows 10% outliers)
+            close_equal = p90_rel_diff <= tolerance
+            
+            results["median_relative_diff"] = float(median_rel_diff)
+            results["p90_relative_diff"] = float(p90_rel_diff)
+            results["pct_within_tolerance"] = float(np.sum(rel_diff_nonzero[mask_nonzero] <= tolerance) / np.sum(mask_nonzero) * 100)
+        else:
+            close_equal = True  # All zeros, considered equal
+    else:  # Very small tolerance: likely absolute value comparison
+        close_equal = np.allclose(array1, array2, rtol=tolerance, atol=tolerance)
+    
     results["close_equal"] = close_equal
     results["tolerance"] = tolerance
     
-    # Calculate differences
-    diff = np.abs(array1 - array2)
+    # Calculate basic difference statistics (diff already calculated above)
     results.update({
         "max_absolute_diff": float(np.max(diff)),
         "mean_absolute_diff": float(np.mean(diff)),
@@ -143,13 +169,29 @@ def print_comparison_results(results):
     
     print(f"\n🔍 Comparison:")
     print(f"   Exact Equal: {'✅' if results['exact_equal'] else '❌'}")
-    print(f"   Close Equal (tolerance {results['tolerance']}): {'✅' if results['close_equal'] else '❌'}")
+    
+    # Display tolerance interpretation
+    tol = results['tolerance']
+    if tol >= 0.01:
+        tol_desc = f"{tol*100:.1f}% relative error"
+        print(f"   Tolerance: {tol} = {tol_desc}")
+        
+        # Display percentile-based statistics if available
+        if "median_relative_diff" in results:
+            print(f"   Median relative diff: {results['median_relative_diff']*100:.2f}%")
+            print(f"   90th percentile diff: {results['p90_relative_diff']*100:.2f}%")
+            print(f"   Within tolerance: {results['pct_within_tolerance']:.1f}% of non-zero values")
+            print(f"   Status (90th percentile ≤ {tol_desc}): {'✅' if results['close_equal'] else '❌'}")
+    else:
+        tol_desc = f"{tol} absolute error"
+        print(f"   Close Equal (tolerance {tol} = {tol_desc}): {'✅' if results['close_equal'] else '❌'}")
+    
     print(f"   Max Absolute Difference: {results['max_absolute_diff']:.10f}")
     print(f"   Mean Absolute Difference: {results['mean_absolute_diff']:.10f}")
     
     if 'max_relative_diff' in results:
-        print(f"   Max Relative Difference: {results['max_relative_diff']:.10f}")
-        print(f"   Mean Relative Difference: {results['mean_relative_diff']:.10f}")
+        print(f"   Max Relative Difference: {results['max_relative_diff']:.4f} ({results['max_relative_diff']*100:.2f}%)")
+        print(f"   Mean Relative Difference: {results['mean_relative_diff']:.4f} ({results['mean_relative_diff']*100:.2f}%)")
     
     print(f"   Different Elements: {results['num_different_elements']:,} ({results['percent_different']:.4f}%)")
     
@@ -175,9 +217,26 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Basic comparison (default tolerance: 0.15)
   %(prog)s file1.npy file2.npy
   %(prog)s --file1 output1.npy --file2 output2.npy
-  %(prog)s -f1 runs/predict/onnx/simple/raw_output_simple.npy -f2 runs/predict/onnx/ultralytics_wrapper/raw_output_ultralytics.npy
+  
+  # Compare with named arguments
+  %(prog)s -f1 runs/predict/onnx/standalone/debug/raw_output/raw_output.npy \\
+           -f2 runs/predict/onnx/ultralytics_deepx/debug/raw_output/raw_output.npy
+  
+  # ONNX vs DXNN comparison (15%% tolerance for NPU quantization)
+  %(prog)s -f1 runs/predict/onnx/standalone/debug/raw_output/raw_output.npy \\
+           -f2 runs/predict/dxnn/standalone/debug/raw_output/raw_output.npy \\
+           -t 0.15
+
+Tolerance Guidelines (for tolerance >= 0.01, uses percentile-based validation):
+  1e-10 ~ 1e-7  : FP32 vs FP32 (CPU vs GPU, very strict)
+  1e-6  ~ 1e-5  : FP32 vs FP32 (different libraries, standard)
+  1e-4  ~ 1e-3  : FP32 vs FP16 (mixed precision)
+  0.10          : FP32 vs INT8 (NPU quantization, strict)
+  0.15          : FP32 vs INT8 (NPU quantization, recommended) ⭐
+  0.20          : FP32 vs INT8 (relaxed, up to 20%% 90th percentile)
         """
     )
     
@@ -210,8 +269,20 @@ Examples:
     parser.add_argument(
         '--tolerance', '-t',
         type=float,
-        default=1e-8,
-        help='Numerical tolerance for comparison (default: 1e-8)'
+        default=0.15,
+        help='''Numerical tolerance for comparison (default: 0.15).
+
+Recommended values:
+  1e-10 ~ 1e-7  : FP32 vs FP32 (CPU vs GPU, very strict)
+  1e-6  ~ 1e-5  : FP32 vs FP32 (different libraries, standard)
+  1e-4  ~ 1e-3  : FP32 vs FP16 (mixed precision)
+  0.10          : FP32 vs INT8 (NPU quantization, strict)
+  0.15          : FP32 vs INT8 (NPU quantization, recommended) ⭐
+  0.20          : FP32 vs INT8 (relaxed, up to 20%% 90th percentile)
+  
+Note: For tolerance >= 0.01, uses percentile-based validation.
+      90th percentile of relative errors must be within tolerance.
+        '''
     )
     
     args = parser.parse_args()

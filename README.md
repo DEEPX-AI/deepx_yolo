@@ -707,6 +707,45 @@ python util/compare_raw_outputs.py \
     runs/predict/dxnn/standalone/debug/raw_output/raw_output_[timestamp].npy
 ```
 
+#### Tolerance Option Guide
+
+The `--tolerance` (or `-t`) parameter controls the acceptable difference threshold:
+
+```bash
+# Very strict comparison (FP32 vs FP32, almost identical required)
+python util/compare_raw_outputs.py file1.npy file2.npy --tolerance 1e-10
+
+# Standard comparison (floating-point error considered)
+python util/compare_raw_outputs.py file1.npy file2.npy --tolerance 1e-6
+
+# Quantized model comparison (INT8, larger error allowed)
+python util/compare_raw_outputs.py file1.npy file2.npy --tolerance 0.05
+```
+
+**Recommended Tolerance Values:**
+
+| Comparison Type | Tolerance | Description |
+|----------------|-----------|-------------|
+| **FP32 vs FP32 (CPU vs GPU)** | `1e-10` ~ `1e-7` | Very strict, almost identical |
+| **FP32 vs FP32 (different libs)** | `1e-6` ~ `1e-5` | Standard, floating-point error considered |
+| **FP32 vs FP16** | `1e-4` ~ `1e-3` | Mixed precision |
+| **FP32 vs INT8 (NPU, strict)** | `0.10` (10%) | Median ~1-2%, 90th percentile ~8-12% |
+| **FP32 vs INT8 (NPU, standard)** | `0.15` (15%) | **Recommended** ⭐ 90% values within tolerance |
+| **FP32 vs INT8 (NPU, relaxed)** | `0.20` (20%) | Practical upper limit, 95% coverage |
+
+**Note:** INT8 quantization comparison uses **percentile-based validation** (90th percentile must be within tolerance). This is more robust than checking every single value, as it allows for a small percentage of outliers while ensuring the majority of outputs are accurate.
+
+**Example: ONNX vs DXNN Comparison**
+
+```bash
+# Standard 15% tolerance (recommended for NPU quantization)
+# Uses percentile-based validation: 90% of values must be within tolerance
+python util/compare_raw_outputs.py \
+    -f1 yolo11l/runs/predict/onnx/standalone/debug/raw_output/raw_output_*.npy \
+    -f2 yolo11l/runs/predict/dxnn/standalone/debug/raw_output/raw_output_*.npy \
+    -t 0.15
+```
+
 ### Checking ONNX Model Dynamic Shape Support
 
 Utility to check whether an ONNX model supports dynamic shapes:

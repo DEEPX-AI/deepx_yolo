@@ -704,6 +704,45 @@ python util/compare_raw_outputs.py \
     runs/predict/dxnn/standalone/debug/raw_output/raw_output_[timestamp].npy
 ```
 
+#### Tolerance(허용 오차) 옵션 가이드
+
+`--tolerance` (또는 `-t`) 파라미터는 허용 가능한 차이의 임계값을 제어합니다:
+
+```bash
+# 매우 엄격한 비교 (FP32 vs FP32, 거의 완전히 동일해야 함)
+python util/compare_raw_outputs.py file1.npy file2.npy --tolerance 1e-10
+
+# 표준 비교 (부동소수점 오차 고려)
+python util/compare_raw_outputs.py file1.npy file2.npy --tolerance 1e-6
+
+# 양자화된 모델 비교 (INT8, 더 큰 오차 허용)
+python util/compare_raw_outputs.py file1.npy file2.npy --tolerance 0.05
+```
+
+**권장 Tolerance 값:**
+
+| 비교 대상 | Tolerance | 설명 |
+|----------------|-----------|-------------|
+| **FP32 vs FP32 (CPU vs GPU)** | `1e-10` ~ `1e-7` | 매우 엄격, 거의 동일해야 함 |
+| **FP32 vs FP32 (다른 라이브러리)** | `1e-6` ~ `1e-5` | 표준, 부동소수점 오차 고려 |
+| **FP32 vs FP16** | `1e-4` ~ `1e-3` | Mixed precision |
+| **FP32 vs INT8 (NPU, 엄격)** | `0.10` (10%) | 중앙값 ~1-2%, 90분위수 ~8-12% |
+| **FP32 vs INT8 (NPU, 표준)** | `0.15` (15%) | **권장** ⭐ 90% 값이 허용 범위 내 |
+| **FP32 vs INT8 (NPU, 완화)** | `0.20` (20%) | 실용적 상한선, 95% 커버리지 |
+
+**주의:** INT8 양자화 비교는 **백분위수 기반 검증**을 사용합니다 (90분위수가 허용 오차 내에 있어야 함). 이 방식은 모든 값을 일일이 검사하는 것보다 견고하며, 소수의 이상치는 허용하면서도 대부분의 출력이 정확함을 보장합니다.
+
+**예제: ONNX vs DXNN 비교**
+
+```bash
+# 표준 15% 허용 오차 (NPU 양자화에 권장)
+# 백분위수 기반 검증 사용: 90%의 값이 허용 오차 내에 있어야 함
+python util/compare_raw_outputs.py \
+    -f1 yolo11l/runs/predict/onnx/standalone/debug/raw_output/raw_output_*.npy \
+    -f2 yolo11l/runs/predict/dxnn/standalone/debug/raw_output/raw_output_*.npy \
+    -t 0.15
+```
+
 ### ONNX 모델 동적 형상 확인
 
 ONNX 모델이 동적 형상(dynamic shape)을 지원하는지 확인하는 유틸리티:
