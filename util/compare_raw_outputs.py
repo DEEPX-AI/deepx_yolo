@@ -182,6 +182,9 @@ def print_comparison_results(results):
             print(f"   90th percentile diff: {results['p90_relative_diff']*100:.2f}%")
             print(f"   Within tolerance: {results['pct_within_tolerance']:.1f}% of non-zero values")
             print(f"   Status (90th percentile ≤ {tol_desc}): {'✅' if results['close_equal'] else '❌'}")
+            
+            # Store for detailed distribution analysis
+            results['_show_distribution'] = True
     else:
         tol_desc = f"{tol} absolute error"
         print(f"   Close Equal (tolerance {tol} = {tol_desc}): {'✅' if results['close_equal'] else '❌'}")
@@ -303,29 +306,103 @@ Note: For tolerance >= 0.01, uses percentile-based validation.
     print_comparison_results(results)
     
     # Additional detailed analysis for debugging
-    if not results.get('identical', False) and 'error' not in results:
-        print("\n🔬 DETAILED ANALYSIS FOR DEBUGGING:")
-        print("-" * 50)
-        
+    if 'error' not in results:
         # Load arrays again for detailed analysis
         array1 = np.load(file1_path)
         array2 = np.load(file2_path)
         
-        # Find locations of largest differences
-        diff = np.abs(array1 - array2)
-        max_diff_idx = np.unravel_index(np.argmax(diff), diff.shape)
+        # Show detailed distribution if percentile-based comparison was used
+        if results.get('_show_distribution', False):
+            print("\n� DETAILED ERROR DISTRIBUTION:")
+            print("-" * 80)
+            
+            # Calculate relative differences for non-zero values
+            diff = np.abs(array1 - array2)
+            mask_nonzero = np.abs(array2) > 1e-5
+            
+            if np.any(mask_nonzero):
+                rel_diff = np.zeros_like(diff)
+                rel_diff[mask_nonzero] = diff[mask_nonzero] / np.abs(array2[mask_nonzero])
+                rel_diff_nonzero = rel_diff[mask_nonzero]
+                
+                total_nonzero = np.sum(mask_nonzero)
+                
+                # Define buckets for distribution
+                buckets = [
+                    (0.0, 0.01, "0.0% - 1.0%"),
+                    (0.01, 0.05, "1.0% - 5.0%"),
+                    (0.05, 0.10, "5.0% - 10.0%"),
+                    (0.10, 0.15, "10.0% - 15.0%"),
+                    (0.15, 0.20, "15.0% - 20.0%"),
+                    (0.20, 0.50, "20.0% - 50.0%"),
+                    (0.50, float('inf'), "50.0%+")
+                ]
+                
+                print(f"\n   Total non-zero values: {total_nonzero:,}")
+                print(f"   Near-zero values (<1e-5): {array1.size - total_nonzero:,} ({(array1.size - total_nonzero) / array1.size * 100:.2f}%)")
+                print(f"\n   📈 Relative Error Distribution (non-zero values only):")
+                print(f"   {'Range':<20} {'Count':>10} {'Percent':>8} {'Cumulative':>11} {'Visualization'}")
+                print(f"   {'-'*20} {'-'*10} {'-'*8} {'-'*11} {'-'*30}")
+                
+                cumulative_count = 0
+                cumulative_pct = 0.0
+                
+                for lower, upper, label in buckets:
+                    if upper == float('inf'):
+                        count = np.sum(rel_diff_nonzero >= lower)
+                    else:
+                        count = np.sum((rel_diff_nonzero >= lower) & (rel_diff_nonzero < upper))
+                    
+                    pct = (count / total_nonzero) * 100
+                    cumulative_count += count
+                    cumulative_pct += pct
+                    
+                    # Visual bar (scale to 30 chars max)
+                    bar_length = int(pct / 3.33)  # 100% = 30 chars
+                    bar = '█' * bar_length
+                    
+                    print(f"   {label:<20} {count:>10,} {pct:>7.2f}% {cumulative_pct:>10.1f}% {bar}")
+                
+                # Show key percentiles
+                print(f"\n   📍 Key Percentiles:")
+                percentiles = [50, 75, 80, 85, 90, 95, 99]
+                for p in percentiles:
+                    value = np.percentile(rel_diff_nonzero, p)
+                    marker = " ⭐" if p == 90 else ""
+                    print(f"      {p:2d}th percentile: {value*100:6.2f}%{marker}")
+                
+                # Highlight 90th percentile region
+                p90 = results['p90_relative_diff']
+                tol = results['tolerance']
+                print(f"\n   🎯 90th Percentile Analysis:")
+                print(f"      90% of values: 0.00% ~ {p90*100:.2f}%")
+                print(f"      10% of values: {p90*100:.2f}% ~ {np.max(rel_diff_nonzero)*100:.2f}%")
+                print(f"      Tolerance threshold: {tol*100:.1f}%")
+                if p90 <= tol:
+                    print(f"      Result: ✅ PASS (90th percentile {p90*100:.2f}% ≤ {tol*100:.1f}%)")
+                else:
+                    print(f"      Result: ❌ FAIL (90th percentile {p90*100:.2f}% > {tol*100:.1f}%)")
         
-        print(f"   Location of max difference: {max_diff_idx}")
-        print(f"   Value 1 at max diff: {array1[max_diff_idx]}")
-        print(f"   Value 2 at max diff: {array2[max_diff_idx]}")
-        print(f"   Difference at max diff: {diff[max_diff_idx]}")
-        
-        # Sample a few values for inspection
-        print(f"\n   Sample comparison (first 5 values):")
-        flat1 = array1.flatten()
-        flat2 = array2.flatten()
-        for i in range(min(5, len(flat1))):
-            print(f"   [{i}] {flat1[i]:.10f} vs {flat2[i]:.10f} (diff: {abs(flat1[i] - flat2[i]):.2e})")
+        # Show max difference location for non-identical results
+        if not results.get('identical', False):
+            print("\n🔬 DETAILED ANALYSIS FOR DEBUGGING:")
+            print("-" * 80)
+            
+            # Find locations of largest differences
+            diff = np.abs(array1 - array2)
+            max_diff_idx = np.unravel_index(np.argmax(diff), diff.shape)
+            
+            print(f"   Location of max difference: {max_diff_idx}")
+            print(f"   Value 1 at max diff: {array1[max_diff_idx]}")
+            print(f"   Value 2 at max diff: {array2[max_diff_idx]}")
+            print(f"   Difference at max diff: {diff[max_diff_idx]}")
+            
+            # Sample a few values for inspection
+            print(f"\n   Sample comparison (first 5 values):")
+            flat1 = array1.flatten()
+            flat2 = array2.flatten()
+            for i in range(min(5, len(flat1))):
+                print(f"   [{i}] {flat1[i]:.10f} vs {flat2[i]:.10f} (diff: {abs(flat1[i] - flat2[i]):.2e})")
 
 if __name__ == "__main__":
     main()

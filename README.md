@@ -746,6 +746,100 @@ python util/compare_raw_outputs.py \
     -t 0.15
 ```
 
+**Example Output with Detailed Distribution:**
+
+```
+🚀 Starting Raw Output Comparison...
+📁 Comparing:
+   File 1: raw_output0_zidane_20251106_113527_583.npy
+   File 2: raw_output0_zidane_20251105_205047_003.npy
+================================================================================
+🔍 RAW OUTPUT COMPARISON RESULTS
+================================================================================
+
+📁 Files:
+   File 1: raw_output0_zidane_20251106_113527_583.npy
+   File 2: raw_output0_zidane_20251105_205047_003.npy
+
+📊 Basic Info:
+   Shape 1: (1, 56, 8400)
+   Shape 2: (1, 56, 8400)
+   Shape Match: ✅
+   Data Type 1: float32
+   Data Type 2: float32
+   Total Elements: 470,400
+
+📈 Statistics:
+   File 1 - Min: -20.210140, Max: 785.002502
+   File 1 - Mean: 28.104315, Std: 84.515289
+   File 2 - Min: 0.000000, Max: 796.703125
+   File 2 - Mean: 28.123386, Std: 84.544266
+
+🔍 Comparison:
+   Exact Equal: ❌
+   Tolerance: 0.15 = 15.0% relative error
+   Median relative diff: 0.60%
+   90th percentile diff: 8.74%
+   Within tolerance: 95.5% of non-zero values
+   Status (90th percentile ≤ 15.0% relative error): ✅
+   Max Absolute Difference: 191.7122802734
+   Mean Absolute Difference: 1.0487236977
+   Max Relative Difference: 99.9657 (9996.57%)
+   Mean Relative Difference: 0.0326 (3.26%)
+   Different Elements: 275,506 (58.5685%)
+
+🎯 FINAL RESULT:
+   ✅ NEARLY_IDENTICAL (within tolerance 0.15)
+   📝 The arrays are numerically equivalent within tolerance.
+================================================================================
+
+📊 DETAILED ERROR DISTRIBUTION:
+--------------------------------------------------------------------------------
+
+   Total non-zero values: 462,248
+   Near-zero values (<1e-5): 8,152 (1.73%)
+
+   📈 Relative Error Distribution (non-zero values only):
+   Range                     Count  Percent  Cumulative Visualization
+   -------------------- ---------- -------- ----------- --------------
+   0.0% - 1.0%             269,529   58.31%       58.3% █████████████████
+   1.0% - 5.0%             111,004   24.01%       82.3% ███████
+   5.0% - 10.0%             42,777    9.25%       91.6% ██
+   10.0% - 15.0%            17,979    3.89%       95.5% █
+   15.0% - 20.0%             8,661    1.87%       97.3% 
+   20.0% - 50.0%            11,034    2.39%       99.7% 
+   50.0%+                    1,264    0.27%      100.0% 
+
+   📍 Key Percentiles:
+      50th percentile:   0.60%
+      75th percentile:   3.05%
+      80th percentile:   4.28%
+      85th percentile:   6.02%
+      90th percentile:   8.74% ⭐
+      95th percentile:  14.17%
+      99th percentile:  30.83%
+
+   🎯 90th Percentile Analysis:
+      90% of values: 0.00% ~ 8.74%
+      10% of values: 8.74% ~ 9996.57%
+      Tolerance threshold: 15.0%
+      Result: ✅ PASS (90th percentile 8.74% ≤ 15.0%)
+```
+
+**Understanding the Output:**
+
+- **Median relative diff (0.60%)**: Half of the values have less than 0.6% error - excellent!
+- **90th percentile (8.74%)**: 90% of values are within 8.74% error - high quality INT8 quantization
+- **Distribution histogram**: Visual representation showing most values (58%) have <1% error
+- **Key percentiles**: Statistical breakdown from 50th to 99th percentile
+- **Percentile-based validation**: Passes if 90th percentile ≤ tolerance (15%)
+
+This detailed output helps you understand:
+- How accurate the quantization is (median ~0.6%)
+- What percentage of values fall within each error range
+- Where outliers occur (10% above 90th percentile)
+- Whether the overall quality meets your requirements
+
 ### Checking ONNX Model Dynamic Shape Support
 
 Utility to check whether an ONNX model supports dynamic shapes:
