@@ -49,6 +49,34 @@ yolov11l_poc/
     └── models/
 ```
 
+## 파일 설명
+
+### 핵심 스크립트 (yolo11l/)
+
+| 파일 | 목적 | 종속성 | 사용 사례 |
+|------|---------|--------------|----------|
+| `export_onnx.py` | PyTorch를 ONNX로 변환 | ultralytics, torch | 모델 준비 |
+| `predict_onnx_standalone.py` | ONNX 추론 (종속성 없음) | cv2, numpy, torch, onnxruntime | 학습, 사용자 정의 |
+| `predict_dxnn_standalone.py` | DXNN 추론 (종속성 없음) | cv2, numpy, torch, dx-engine | 프로덕션, 최소 종속성 |
+
+### 출력 구조
+
+```plaintext
+yolo11l/runs/predict/
+├── onnx/
+│   └── standalone/                    # predict_onnx_standalone.py 출력
+│       ├── [input_image_name]_detected_[timestamp].jpg
+│       └── debug/
+│           ├── input/                 # 전처리된 입력 시각화
+│           └── raw_output/            # 원시 모델 출력 (.npy)
+└── dxnn/
+    └── standalone/                    # predict_dxnn_standalone.py 출력
+        ├── [input_image_name]_detected_[timestamp].jpg
+        └── debug/
+            ├── input/                 # 전처리된 입력 시각화
+            └── raw_output/            # 원시 모델 출력 (.npy)
+```
+
 ## 🛠️ 사전 요구사항
 
 ### 1. Python 환경 요구사항
@@ -121,9 +149,10 @@ python export_onnx.py
 
 ### 2. 객체 감지 추론
 
-이 프로젝트는 **네 가지 다른 추론 구현**을 제공합니다:
+이 프로젝트는 **두 가지 다른 추론 구현**을 제공합니다:
 
-#### 2.1. 독립형 ONNX 추론 (학습용으로 권장)
+#### 2.1. ONNX 추론
+#### 2.1.1 Standalone ONNX 추론 (학습용으로 권장)
 
 ```bash
 cd yolo11l
@@ -142,7 +171,8 @@ python predict_onnx_standalone.py
 - 포팅된 NMS 및 좌표 스케일링 함수
 - 모든 Boxes 속성을 가진 완전한 Results 객체
 
-#### 2.3. 독립형 DXNN 추론
+#### 2.2. DXNN 추론
+##### 2.2.1. Standalone DXNN 추론
 
 ```bash
 cd yolo11l
@@ -152,7 +182,7 @@ python predict_dxnn_standalone.py
 **기능:**
 - 가속 추론을 위한 DEEPX 런타임
 - Ultralytics 종속성 없음
-- 독립형 ONNX 버전과 유사한 구조
+- Standalone ONNX 버전과 유사한 구조
 
 ### 3. 실행 프로세스
 
@@ -164,73 +194,6 @@ python predict_dxnn_standalone.py
 4. **후처리**: NMS, 좌표 스케일링, Results 객체 생성
 5. **시각화**: 경계 상자 그리기 및 결과 저장
 6. **출력**: `runs/predict/{backend}/{script_name}/` 디렉터리에 저장
-
-### 4. 실행 결과 예제
-
-```plaintext
-Processing directory of images.
-Results will be saved in 'runs/predict/onnx/standalone' folder.
---------------------------------------------------
-
-[1/3] Processing: boats.jpg
-Debug info:
-  Original size: 1280x720
-  Ratio: (0.5, 0.5)
-  Padding (dw, dh): (80.0, 0.0)
-  Input tensor shape: (1, 3, 640, 640)
-  Input tensor range: [0.000, 1.000]
-
-Loading ONNX model: models/yolo11l.onnx
-Running ONNX inference...
-Raw output shape: (1, 84, 8400)
-Raw output range: [-4.234, 8.567]
-
-[Postprocess] Total detections: 2
-==================================================
-Total object detections: 2
-Boxes tensor shape: torch.Size([2, 6])
-Confidence range: 0.878 ~ 0.914
-Class distribution: {0: 1, 8: 1}
-
-[boats] Total 2 objects detected.
-  1. person: 0.91 - Position: (221, 402) ~ (344, 857)
-  2. boat: 0.88 - Position: (90, 456) ~ (1259, 880)
-
-Detection result saved to 'runs/predict/onnx/standalone/boats_detected_20251021_143052_123.jpg' file.
---------------------------------------------------
-
-PROCESSING SUMMARY
-======================================================================
-Total images processed: 3
-Output directory: runs/predict/onnx/standalone
-
-Saved files:
-  1. runs/predict/onnx/standalone/boats_detected_20251021_143052_123.jpg
-  2. runs/predict/onnx/standalone/bus_detected_20251021_143053_456.jpg
-  3. runs/predict/onnx/standalone/zidane_detected_20251021_143054_789.jpg
-======================================================================
-Processing completed successfully!
-======================================================================
-```
-
-
-
-## ⚙️ 구성 옵션
-
-### 공통 구성 (모든 스크립트)
-
-```python
-# 모델 경로
-MODEL_PATH = 'models/yolo11l.onnx'  # 또는 DXNN의 경우 'models/yolo11l.dxnn'
-SOURCE_PATH = '../assets'            # 입력 이미지 경로 (파일 또는 디렉터리)
-OUTPUT_DIR = 'runs/predict/...'     # 결과 저장 디렉터리
-
-# 감지 매개변수 (Ultralytics 기본값)
-CONFIDENCE_THRESHOLD = 0.25   # 신뢰도 임계값 (0.0 ~ 1.0)
-IOU_THRESHOLD = 0.45         # NMS를 위한 IoU 임계값
-INPUT_SIZE = 640             # 모델 입력 크기
-```
-
 
 
 ## 🔧 문제 해결
@@ -256,33 +219,6 @@ pip install dx-engine
 python -c "from dx_engine import InferenceEngine; print('DEEPX OK')"
 ```
 
-## 파일 설명
-
-### 핵심 스크립트 (yolo11l/)
-
-| 파일 | 목적 | 종속성 | 사용 사례 |
-|------|---------|--------------|----------|
-| `export_onnx.py` | PyTorch를 ONNX로 변환 | ultralytics, torch | 모델 준비 |
-| `predict_onnx_standalone.py` | ONNX 추론 (종속성 없음) | cv2, numpy, torch, onnxruntime | 학습, 사용자 정의 |
-| `predict_dxnn_standalone.py` | DXNN 추론 (종속성 없음) | cv2, numpy, torch, dx-engine | 프로덕션, 최소 종속성 |
-
-### 출력 구조
-
-```plaintext
-yolo11l/runs/predict/
-├── onnx/
-│   └── standalone/                    # predict_onnx_standalone.py 출력
-│       ├── [input_image_name]_detected_[timestamp].jpg
-│       └── debug/
-│           ├── input/                 # 전처리된 입력 시각화
-│           └── raw_output/            # 원시 모델 출력 (.npy)
-└── dxnn/
-    └── standalone/                    # predict_dxnn_standalone.py 출력
-        ├── [input_image_name]_detected_[timestamp].jpg
-        └── debug/
-            ├── input/                 # 전처리된 입력 시각화
-            └── raw_output/            # 원시 모델 출력 (.npy)
-```
 
 ## 🔍 디버깅 및 비교
 
@@ -291,12 +227,210 @@ yolo11l/runs/predict/
 프로젝트에는 서로 다른 구현 간의 출력을 비교하는 유틸리티가 포함되어 있습니다:
 
 ```bash
-# 원시 모델 출력 비교
+# 원시 모델 출력 비교(onnx vs dxnn)
 python util/compare_raw_outputs.py \
     runs/predict/onnx/standalone/debug/raw_output/raw_output_[timestamp].npy \
     runs/predict/dxnn/standalone/debug/raw_output/raw_output_[timestamp].npy
 ```
 
+#### Tolerance(허용 오차) 옵션 가이드
+
+`--tolerance` (또는 `-t`) 파라미터는 허용 가능한 차이의 임계값을 제어합니다:
+
+```bash
+# 매우 엄격한 비교 (FP32 vs FP32, 거의 완전히 동일해야 함)
+python util/compare_raw_outputs.py file1.npy file2.npy --tolerance 1e-10
+
+# 표준 비교 (부동소수점 오차 고려)
+python util/compare_raw_outputs.py file1.npy file2.npy --tolerance 1e-6
+
+# 양자화된 모델 비교 (INT8, 더 큰 오차 허용)
+python util/compare_raw_outputs.py file1.npy file2.npy --tolerance 0.05
+```
+
+**권장 Tolerance 값:**
+
+| 비교 대상 | Tolerance | 설명 |
+|----------------|-----------|-------------|
+| **FP32 vs FP32 (CPU vs GPU)** | `1e-10` ~ `1e-7` | 매우 엄격, 거의 동일해야 함 |
+| **FP32 vs FP32 (다른 라이브러리)** | `1e-6` ~ `1e-5` | 표준, 부동소수점 오차 고려 |
+| **FP32 vs FP16** | `1e-4` ~ `1e-3` | Mixed precision |
+| **FP32 vs INT8 (NPU, 엄격)** | `0.10` (10%) | 중앙값 ~1-2%, 90분위수 ~8-12% |
+| **FP32 vs INT8 (NPU, 표준)** | `0.15` (15%) | **권장** ⭐ 90% 값이 허용 범위 내 |
+| **FP32 vs INT8 (NPU, 완화)** | `0.20` (20%) | 실용적 상한선, 95% 커버리지 |
+
+**주의:** INT8 양자화 비교는 **백분위수 기반 검증**을 사용합니다 (90분위수가 허용 오차 내에 있어야 함). 이 방식은 모든 값을 일일이 검사하는 것보다 견고하며, 소수의 이상치는 허용하면서도 대부분의 출력이 정확함을 보장합니다.
+
+**예제: ONNX vs DXNN 비교**
+
+```bash
+# 표준 15% 허용 오차 (NPU 양자화에 권장)
+# 백분위수 기반 검증 사용: 90%의 값이 허용 오차 내에 있어야 함
+python util/compare_raw_outputs.py \
+    -f1 yolo11l/runs/predict/onnx/standalone/debug/raw_output/raw_output_*.npy \
+    -f2 yolo11l/runs/predict/dxnn/standalone/debug/raw_output/raw_output_*.npy \
+    -t 0.15
+```
+
+**상세 분포가 포함된 출력 예제:**
+
+```
+🚀 Starting Raw Output Comparison...
+📁 Comparing:
+   File 1: raw_output0_zidane_20251106_113527_583.npy
+   File 2: raw_output0_zidane_20251105_205047_003.npy
+================================================================================
+🔍 RAW OUTPUT COMPARISON RESULTS
+================================================================================
+
+📁 Files:
+   File 1: raw_output0_zidane_20251106_113527_583.npy
+   File 2: raw_output0_zidane_20251105_205047_003.npy
+
+📊 Basic Info:
+   Shape 1: (1, 56, 8400)
+   Shape 2: (1, 56, 8400)
+   Shape Match: ✅
+   Data Type 1: float32
+   Data Type 2: float32
+   Total Elements: 470,400
+
+📈 Statistics:
+   File 1 - Min: -20.210140, Max: 785.002502
+   File 1 - Mean: 28.104315, Std: 84.515289
+   File 2 - Min: 0.000000, Max: 796.703125
+   File 2 - Mean: 28.123386, Std: 84.544266
+
+🔍 Comparison:
+   Exact Equal: ❌
+   Tolerance: 0.15 = 15.0% relative error
+   Median relative diff: 0.60%
+   90th percentile diff: 8.74%
+   Within tolerance: 95.5% of non-zero values
+   Status (90th percentile ≤ 15.0% relative error): ✅
+   Max Absolute Difference: 191.7122802734
+   Mean Absolute Difference: 1.0487236977
+   Max Relative Difference: 99.9657 (9996.57%)
+   Mean Relative Difference: 0.0326 (3.26%)
+   Different Elements: 275,506 (58.5685%)
+
+🎯 FINAL RESULT:
+   ✅ NEARLY_IDENTICAL (within tolerance 0.15)
+   📝 The arrays are numerically equivalent within tolerance.
+================================================================================
+
+📊 DETAILED ERROR DISTRIBUTION:
+--------------------------------------------------------------------------------
+
+   Total non-zero values: 462,248
+   Near-zero values (<1e-5): 8,152 (1.73%)
+
+   📈 Relative Error Distribution (non-zero values only):
+   Range                     Count  Percent  Cumulative Visualization
+   -------------------- ---------- -------- ----------- --------------
+   0.0% - 1.0%             269,529   58.31%       58.3% █████████████████
+   1.0% - 5.0%             111,004   24.01%       82.3% ███████
+   5.0% - 10.0%             42,777    9.25%       91.6% ██
+   10.0% - 15.0%            17,979    3.89%       95.5% █
+   15.0% - 20.0%             8,661    1.87%       97.3% 
+   20.0% - 50.0%            11,034    2.39%       99.7% 
+   50.0%+                    1,264    0.27%      100.0% 
+
+   📍 Key Percentiles:
+      50th percentile:   0.60%
+      75th percentile:   3.05%
+      80th percentile:   4.28%
+      85th percentile:   6.02%
+      90th percentile:   8.74% ⭐
+      95th percentile:  14.17%
+      99th percentile:  30.83%
+
+   🎯 90th Percentile Analysis:
+      90% of values: 0.00% ~ 8.74%
+      10% of values: 8.74% ~ 9996.57%
+      Tolerance threshold: 15.0%
+      Result: ✅ PASS (90th percentile 8.74% ≤ 15.0%)
+```
+
+**출력 이해하기:**
+
+- **Median relative diff (0.60%)**: 절반의 값이 0.6% 미만의 오차를 가짐 - 매우 우수!
+- **90th percentile (8.74%)**: 90%의 값이 8.74% 이내의 오차 - 고품질 INT8 양자화
+- **분포 히스토그램**: 대부분의 값(58%)이 1% 미만의 오차를 가진다는 것을 시각적으로 표현
+- **주요 백분위수**: 50분위수부터 99분위수까지의 통계적 분석
+- **백분위수 기반 검증**: 90분위수 ≤ tolerance(15%)이면 통과
+
+이 상세한 출력을 통해 다음을 이해할 수 있습니다:
+- 양자화가 얼마나 정확한지 (중앙값 ~0.6%)
+- 각 오차 범위에 해당하는 값의 비율
+- 이상치(outlier)가 어디에서 발생하는지 (90분위수 이상 10%)
+- 전체 품질이 요구사항을 충족하는지 여부
+
+### ONNX 모델 동적 형상 확인
+
+ONNX 모델이 동적 형상(dynamic shape)을 지원하는지 확인하는 유틸리티:
+
+```bash
+# 기본 모델 확인
+python util/check_onnx_dynamic.py
+
+# 특정 모델 확인
+python util/check_onnx_dynamic.py --model yolo11l/models/yolo11l.onnx
+python util/check_onnx_dynamic.py -m yolo11l-seg/models/yolo11l-seg.onnx
+```
+
+**출력 예시:**
+```
+================================================================================
+ONNX Model Analysis: yolo11l/models/yolo11l.onnx
+================================================================================
+
+📥 Input Information:
+--------------------------------------------------------------------------------
+
+Input name: images
+Shape:
+  [0] Dynamic size: batch ⭐
+  [1] Fixed size: 3
+  [2] Dynamic size: height ⭐
+  [3] Dynamic size: width ⭐
+Full shape: ['batch', '3', 'height', 'width']
+
+================================================================================
+📤 Output Information:
+--------------------------------------------------------------------------------
+
+Output name: output0
+Shape:
+  [0] Dynamic size: batch ⭐
+  [1] Fixed size: 84
+  [2] Dynamic size: anchors ⭐
+Full shape: ['batch', '84', 'anchors']
+
+================================================================================
+📊 Analysis Results:
+--------------------------------------------------------------------------------
+✅ This model supports dynamic shapes (dynamic=True).
+
+Dynamic dimensions:
+  - Input: Contains dynamic shape
+  - Output: Contains dynamic shape
+
+Available features:
+  ✓ Batch processing available (BATCH_SIZE > 1)
+  ✓ Various input sizes supported
+  ✓ Runtime shape adjustment possible
+================================================================================
+```
+
+**동적 형상(Dynamic Shape)이란?**
+- ✅ **동적 모델**: 입력 크기를 런타임에 변경 가능 (예: 640x640, 480x640, 1024x1024)
+- ❌ **고정 모델**: 입력 크기가 고정됨 (예: 항상 640x640만 가능)
+
+**사용 시기:**
+- ONNX 모델 export 후 동적 형상 지원 확인
+- rect=True 모드 사용 가능 여부 확인 (동적 형상 필요)
+- 배치 처리 가능 여부 확인
 
 ### 디버그 기능
 
