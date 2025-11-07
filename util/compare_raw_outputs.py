@@ -79,22 +79,36 @@ def compare_raw_outputs(file1_path, file2_path, tolerance=0.15):
     # Use percentile-based comparison for robustness against outliers
     if tolerance >= 0.01:  # Likely percentage-based (e.g., 0.05 = 5%)
         # Calculate relative differences for non-zero values
-        mask_nonzero = np.abs(array2) > 1e-5
+        # IMPROVEMENT: Exclude values where BOTH arrays have significant values
+        # This handles aggressive quantization where low-confidence detections become 0
+        mask_nonzero_ref = np.abs(array2) > 1e-5  # Reference (usually ONNX) non-zero
+        mask_nonzero_test = np.abs(array1) > 1e-5  # Test (usually DXNN) non-zero
+        
+        # Only compare where BOTH arrays have non-zero values
+        # This excludes cases where quantization zeros out low-confidence detections
+        mask_both_nonzero = mask_nonzero_ref & mask_nonzero_test
+        
         rel_diff_nonzero = np.zeros_like(diff)
-        if np.any(mask_nonzero):
-            rel_diff_nonzero[mask_nonzero] = diff[mask_nonzero] / np.abs(array2[mask_nonzero])
+        if np.any(mask_both_nonzero):
+            rel_diff_nonzero[mask_both_nonzero] = diff[mask_both_nonzero] / np.abs(array2[mask_both_nonzero])
             
             # Check if median and 90th percentile are within tolerance
             # This approach is robust against outliers
-            median_rel_diff = np.median(rel_diff_nonzero[mask_nonzero])
-            p90_rel_diff = np.percentile(rel_diff_nonzero[mask_nonzero], 90)
+            median_rel_diff = np.median(rel_diff_nonzero[mask_both_nonzero])
+            p90_rel_diff = np.percentile(rel_diff_nonzero[mask_both_nonzero], 90)
             
             # Pass if 90th percentile is within tolerance (allows 10% outliers)
             close_equal = p90_rel_diff <= tolerance
             
             results["median_relative_diff"] = float(median_rel_diff)
             results["p90_relative_diff"] = float(p90_rel_diff)
-            results["pct_within_tolerance"] = float(np.sum(rel_diff_nonzero[mask_nonzero] <= tolerance) / np.sum(mask_nonzero) * 100)
+            results["pct_within_tolerance"] = float(np.sum(rel_diff_nonzero[mask_both_nonzero] <= tolerance) / np.sum(mask_both_nonzero) * 100)
+            
+            # Additional statistics for aggressive quantization analysis
+            results["nonzero_ref_count"] = int(np.sum(mask_nonzero_ref))
+            results["nonzero_test_count"] = int(np.sum(mask_nonzero_test))
+            results["nonzero_both_count"] = int(np.sum(mask_both_nonzero))
+            results["quantization_zeros"] = int(np.sum(mask_nonzero_ref & ~mask_nonzero_test))
         else:
             close_equal = True  # All zeros, considered equal
     else:  # Very small tolerance: likely absolute value comparison
@@ -182,6 +196,14 @@ def print_comparison_results(results):
             print(f"   90th percentile diff: {results['p90_relative_diff']*100:.2f}%")
             print(f"   Within tolerance: {results['pct_within_tolerance']:.1f}% of non-zero values")
             print(f"   Status (90th percentile ≤ {tol_desc}): {'✅' if results['close_equal'] else '❌'}")
+            
+            # Show aggressive quantization statistics if available
+            if "quantization_zeros" in results:
+                print(f"\n   🔍 Quantization Analysis:")
+                print(f"   Reference (ONNX) non-zero: {results['nonzero_ref_count']:,}")
+                print(f"   Test (DXNN) non-zero: {results['nonzero_test_count']:,}")
+                print(f"   Both non-zero (compared): {results['nonzero_both_count']:,}")
+                print(f"   Quantized to zero: {results['quantization_zeros']:,} ({results['quantization_zeros']/results['nonzero_ref_count']*100:.1f}% of reference)")
             
             # Store for detailed distribution analysis
             results['_show_distribution'] = True
@@ -317,15 +339,21 @@ Note: For tolerance >= 0.01, uses percentile-based validation.
             print("-" * 80)
             
             # Calculate relative differences for non-zero values
+            # Use mask_both_nonzero to exclude quantized zeros
             diff = np.abs(array1 - array2)
-            mask_nonzero = np.abs(array2) > 1e-5
+            mask_nonzero_ref = np.abs(array2) > 1e-5
+            mask_nonzero_test = np.abs(array1) > 1e-5
+            mask_both_nonzero = mask_nonzero_ref & mask_nonzero_test
             
-            if np.any(mask_nonzero):
+            if np.any(mask_both_nonzero):
                 rel_diff = np.zeros_like(diff)
-                rel_diff[mask_nonzero] = diff[mask_nonzero] / np.abs(array2[mask_nonzero])
-                rel_diff_nonzero = rel_diff[mask_nonzero]
+                rel_diff[mask_both_nonzero] = diff[mask_both_nonzero] / np.abs(array2[mask_both_nonzero])
+                rel_diff_nonzero = rel_diff[mask_both_nonzero]
                 
-                total_nonzero = np.sum(mask_nonzero)
+                total_nonzero = np.sum(mask_both_nonzero)
+                total_ref_nonzero = np.sum(mask_nonzero_ref)
+                total_test_nonzero = np.sum(mask_nonzero_test)
+                quantized_zeros = np.sum(mask_nonzero_ref & ~mask_nonzero_test)
                 
                 # Define buckets for distribution
                 buckets = [
@@ -338,9 +366,13 @@ Note: For tolerance >= 0.01, uses percentile-based validation.
                     (0.50, float('inf'), "50.0%+")
                 ]
                 
-                print(f"\n   Total non-zero values: {total_nonzero:,}")
-                print(f"   Near-zero values (<1e-5): {array1.size - total_nonzero:,} ({(array1.size - total_nonzero) / array1.size * 100:.2f}%)")
-                print(f"\n   📈 Relative Error Distribution (non-zero values only):")
+                print(f"\n   📊 Value Distribution:")
+                print(f"   Total array size: {array1.size:,}")
+                print(f"   Reference non-zero: {total_ref_nonzero:,} ({total_ref_nonzero/array1.size*100:.2f}%)")
+                print(f"   Test non-zero: {total_test_nonzero:,} ({total_test_nonzero/array1.size*100:.2f}%)")
+                print(f"   Both non-zero (compared): {total_nonzero:,} ({total_nonzero/array1.size*100:.2f}%)")
+                print(f"   Quantized to zero (excluded): {quantized_zeros:,} ({quantized_zeros/total_ref_nonzero*100:.2f}% of reference)")
+                print(f"\n   📈 Relative Error Distribution (both non-zero values only):")
                 print(f"   {'Range':<20} {'Count':>10} {'Percent':>8} {'Cumulative':>11} {'Visualization'}")
                 print(f"   {'-'*20} {'-'*10} {'-'*8} {'-'*11} {'-'*30}")
                 
