@@ -149,7 +149,10 @@ INPUT_SIZE = 640
 # False: Square padding (e.g., 640x640) - matches Ultralytics rect=False
 # True: Rectangular, preserve aspect ratio (e.g., 480x640) - matches Ultralytics rect=True
 # NOTE: ONNX Runtime supports dynamic shapes, so rect=True works fine
-RECT_OPT = True
+# RECT_OPT = True
+
+# NOTE: For DXNN and tolerance calculations, dynamic shapes cannot be used. Set the letterbox rect option to false to match the NPU's fixed shape output.
+RECT_OPT = False
 
 # COCO Pose keypoint names (17 keypoints)
 KEYPOINT_NAMES = [
